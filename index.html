@@ -390,7 +390,11 @@ const CFG = {
   // Только оболочка royal-ветки, ядро и баланс не трогает. Где включено — список скинов (DEV: ?goals2=1|0). В исходнике — нигде:
   // сборка dist-goals/ (ссылка snap-halves-goals) включает его для royal поверх сочности v2; релиз и royal-juice — без него.
   GOALS2: ['royal'],
-  G2_BAR: true,        // лента «до победы» на верхней кромке рамы поля; false — остаётся только медальон с флажком и числом (GPT советовал без ленты — сравнить на плейтесте)
+  // v2 (18.11 вечер, отзыв Андрея: «не нравится эта полоска… на старте уровня показывать, какие заказы надо собрать, и потом они передвигаются вверх…
+  // более понятно и медленнее лететь в лотки заказов, а когда долетают — доп. эффекты сатисфай»): ленты и медальона нет (ручки оставлены), вместо них —
+  // интро заказов по центру, медленный полёт целой фигуры дугой, ответ карточки на прилёт, хлопок закрытого заказа, «тающая» очередь с крупным «+N».
+  G2_FLAG: false,      // медальон с финишным флажком и числом оставшихся фигур у верхнего правого угла поля (и искра из места в заказе к нему)
+  G2_BAR: false,       // лента «до победы» на верхней кромке рамы поля (только вместе с G2_FLAG) — Андрей 18.11: «не нравится эта полоска»
   G2_BAR_H: 12,        // высота ленты; справа — медальон с финишным флажком и числом оставшихся фигур (радиус G2_STAR_R)
   G2_STAR_R: 15,
   G2_SPARK_MS: 260,    // искра от места в заказе к полосе: фигура села → искра → полоса подросла, число тикнуло
@@ -398,11 +402,26 @@ const CFG = {
   G2_STAMP_AT: 150,    // место в заказе: через столько мс после посадки на фишку ложится зелёная галочка-штамп (G2_STAMP_MS — её удар)
   G2_STAMP_MS: 170,
   G2_DONE_DIM: 0.42,   // закрытое место гаснет до такой непрозрачности: яркими в карточке остаются только нужные фигуры
-  G2_COMET_N: 7,       // хвост кометы за фигурой, летящей в заказ (в лоток — без хвоста)
+  G2_COMET_N: 5,       // хвост кометы за фигурой, летящей в заказ (в лоток — без хвоста)
   G2_AIM: true,        // пока держишь свайп со стыковкой — пунктирная дуга от пары к месту, куда уйдёт фигура (заказ — цвет фигуры, лоток — янтарь, «не влезет» — красная)
   G2_HOT_LEFT: 3,      // осталось не больше стольких фигур — полоса и звезда «горят» золотом
   G2_LAST_MIN: 4,      // выкрик «Last one!» — только если в уровне не меньше стольких фигур (уроки без него)
-  G2_QUEUE_COUNT: false, // монетка «+N» у следующего заказа: нет — «сколько осталось» несёт одно число на звезде
+  G2_QUEUE_COUNT: true, // монетка «+N» у кармана очереди — крупнее, карман стопкой: очередь «тает» с каждым закрытым заказом; очередь кончилась — оставшиеся карточки в золоте с флажками
+  G2_INTRO: true,      // интро уровня: открытые заказы крупно по центру над приглушённым полем → пауза → уезжают на свои места в панели → ввод включается. Тап — пропуск.
+  G2_INTRO_FROM: 3,    // с какого уровня (номер в игре); на уроках без раздачи и пока на старте уровня ждёт туториальный фокус — интро нет
+  G2_INTRO_IN: 240,    // появление карточек (мс); дальше пауза G2_INTRO_HOLD и переезд G2_INTRO_FLY (после тапа — G2_INTRO_FAST)
+  G2_INTRO_HOLD: 1000,
+  G2_INTRO_FLY: 480,
+  G2_INTRO_FAST: 240,
+  G2_INTRO_SKIP_AT: 200, // тап раньше этого времени не считается пропуском (случайное касание после победы)
+  G2_INTRO_SCALE: 2, // во сколько раз карточки крупнее, чем в панели (не шире экрана)
+  G2_INTRO_DIM: 0.5,   // насколько приглушено поле под карточками
+  G2_FLY_MS: 600,      // полёт целой фигуры в заказ (сочность v2 — 330): подъём G2_FLY_LIFT мс на месте (фигура вырастает ×G2_FLY_BIG), затем плавная дуга вбок, к месту — уменьшается
+  G2_FLY_LIFT: 110,
+  G2_FLY_BIG: 1.18,
+  G2_FLY_ARC: 0.2,     // прогиб дуги — доля расстояния (34…84 px)
+  G2_LAND_SQ: 0.1,     // прилёт: карточка сжимается по вертикали на столько и пружинит; место вспыхивает; соседние места подпрыгивают на G2_HOP_PX
+  G2_HOP_PX: 4,
   G2_WARN_EMPTY: 8,    // тревога поля по свободным клеткам (замер audit/danger.mjs): ≤ 8 — янтарная кромка (40 % таких партий проигрываются, до конца ~14 ходов)
   G2_DANGER_EMPTY: 5,  // ≤ 5 — красное свечение по краям, счётчик свободных клеток, стук сердца (61 %, ~7 ходов)
   G2_CRIT_EMPTY: 2,    // ≤ 2 — быстрый пульс (83 %, ~2 хода)
@@ -1618,6 +1637,10 @@ const Audio = {
   g2final(){ [659, 880].forEach((f, i) => this.tone(f, 140, 'triangle', i * 0.09, 0.11)); log('sound', 'last.order'); },
   g2last(){ [880, 1175, 1568].forEach((f, i) => this.tone(f, 140, 'triangle', i * 0.075, 0.14)); this.tone(2093, 220, 'sine', 0.24, 0.06); log('sound', 'last.one'); },
   g2warn(stage){ const f = stage >= 3 ? 196 : stage === 2 ? 233 : 294; this.tone(f, 170, 'triangle', 0, stage >= 2 ? 0.15 : 0.09, f * 0.75); if (stage >= 2) this.tone(f, 170, 'triangle', 0.2, 0.12, f * 0.75); log('sound', 'warn', 'stage=' + stage); },
+  g2stamp(delay){ this.tone(520, 55, 'triangle', delay, 0.1, 330); this.hiss(28, 2200, 900, delay, 0.06); },                                   // штамп-галочка на месте (без журнала)
+  g2pop(){ this.tone(660, 90, 'sine', 0, 0.12, 1320); this.hiss(110, 3000, 7000, 0.02, 0.07, 'highpass'); log('sound', 'order.pop'); },         // закрытый заказ лопнул
+  g2new(delay){ this.tone(523, 80, 'sine', delay, 0.08, 784); log('sound', 'order.new'); },                                                   // новый заказ встал на место
+  g2seat(delay){ this.tone(440, 60, 'triangle', delay, 0.07, 300); },                                                                         // интро: карточка села в панель
   g2beat(fast){ this.tone(128, 85, 'sine', 0, fast ? 0.2 : 0.15, 78); this.tone(112, 100, 'sine', fast ? 0.13 : 0.17, fast ? 0.14 : 0.1, 70); },
   lose(){ this.tone(330, 220, 'triangle', 0, 0.16, 220); this.tone(220, 360, 'triangle', 0.18, 0.16, 140); log('sound', 'lose'); },
 };
@@ -1808,12 +1831,13 @@ function hud(){
 // --- ход в оболочке: ядро считает, оболочка раскладывает эффекты по абсолютному времени ---
 function doMove(m){
   if (!G.s || G.screen !== 'game' || G.paused || G.ending || isWin(G.s) || isLose(G.s)) return false;
+  if (G2 && G.g2 && G.g2.intro){ G.g2.intro = false; log('fx.end', 'goal.intro', 'move'); }   // ход из хука/клавиш — интро снимается сразу (касание — см. pointerdown)
   if (G.drops.some(D => clock() < D.t1)){ G.queued = m; log('input', 'queued', 'cell=' + (m >> 2)); if (J2) dropsFastForward(); return true; }   // 17.11: новая половинка ещё падает — ход подождёт, пока она встанет (раньше ход обрывал падение)
   const i = m >> 2, d = m & 3;
   if (G.s.grid[i] <= 0) return false;
   const next = applyMove(G.s, m);
   if (!next){ bump(i, d); return false; }
-  snapView(); clearFx(false);
+  snapView(); clearFx(false); if (G2) g2CarryFlights();
   G.lastInputT = clock();
   G.combo = next.last.partner >= 0 ? G.combo + 1 : 0; G.bestCombo = Math.max(G.bestCombo || 0, G.combo);   // лучшая серия — в результаты победы (royal)
   G.hist.push(G.s); G.s = next;
@@ -2080,12 +2104,13 @@ function winFigures(el){
 // Магнит: обе половинки сами летят друг к другу (tShow…t0), дальше — как обычная стыковка. Возвращает время конца цепочки событий.
 function addMerge(o){
   const ts = G.timeScale, s = G.s, magnet = o.kind === 'magnet', col = o.color, j2 = J2 && !magnet;   // v2: стыковка от контакта — замок и пружина (магнит — как был)
-  const t1 = o.t0 + (j2 ? CFG.J2_DOCK_MS : CFG.DOCK_MS * (magnet ? 0.55 : 1)) / ts, flyEnd = t1 + (J2 ? CFG.J2_FLY_MS : CFG.FLY_MS) / ts;
+  const g2f = G2 && !!G.g2 && o.target.kind === 'order';        // G2: в заказ фигура летит медленнее и целиком (drawG2Flight)
+  const t1 = o.t0 + (j2 ? CFG.J2_DOCK_MS : CFG.DOCK_MS * (magnet ? 0.55 : 1)) / ts, flyEnd = t1 + (g2f ? CFG.G2_FLY_MS : J2 ? CFG.J2_FLY_MS : CFG.FLY_MS) / ts;
   const first = (sideOf(o.code) & 1) === 0;                    // пришла левая/верхняя
   const aCell = first ? o.active : o.partner, bCell = first ? o.partner : o.active, vert = isVert(o.code);
   const target = o.target.kind === 'order' ? { ...o.target, n: s.queue[o.target.id].length } : o.target;
   const M = { aCell, bCell, aCode: first ? o.code : o.partnerCode, bCode: first ? o.partnerCode : o.code, vert, active: o.active, color: col, magnet,
-    tShow: o.tShow, t0: o.t0, t1, flyEnd, target, combo: o.combo || 1, j2 };
+    tShow: o.tShow, t0: o.t0, t1, flyEnd, target, combo: o.combo || 1, j2, g2f };
   G.merges.push(M);
   fxOpen('dock', flyEnd, SHAPES[col] + ' target=' + target.kind + ' combo=' + M.combo, M);
   // момент «щёлк»: конфетти и искры цвета фигуры, надпись, встряска
@@ -2153,7 +2178,7 @@ function runView(now){
   G.vq.sort((a, b) => a.t - b.t);
   while (G.vq.length && G.vq[0].t <= now) G.vq.shift().fn();
 }
-function fillSlot(T, t){ const c = G.view.cards[T.slot]; if (c && c.id === T.id){ c.f[T.k] = true; c.pop[T.k] = t; c.land = t; } G.view.served++; G.view.landT = t; if (G2) g2Spark(T, t); }   // land — v2: карточка вздрагивает от посадки
+function fillSlot(T, t){ const c = G.view.cards[T.slot]; if (c && c.id === T.id){ c.f[T.k] = true; c.pop[T.k] = t; c.land = t; } G.view.served++; G.view.landT = t; if (G2 && G.g2){ if (c && c.id === T.id) c.landK = T.k; Audio.g2stamp(CFG.G2_STAMP_AT / 1000 / G.timeScale); g2Spark(T, t); } }   // land — v2: карточка вздрагивает от посадки
 // Что происходит после того, как фигура долетела (tL): слот заказа или лоток, затем цепочка ядра —
 // заказ закрылся, пришёл новый, лоток отдал подошедшее. Возвращает время конца цепочки.
 function scheduleDelivery(T, color, tL, evs){
@@ -2168,6 +2193,7 @@ function scheduleDelivery(T, color, tL, evs){
       vAt(t, () => { const c = G.view.cards[e.slot]; if (c && c.id === e.id) c.done = t; });
       burst(12, cx, cy, t, { type: 'star', color: 2, v: 0.16, life: 520, r: 6, g: 0 });
       burst(12, cx, cy, t, { type: 'rect', colors: [3, -2, 2], v: 0.2, vy: -0.1, life: 700, r: 3.5, g: 0.0005 });
+      if (G2 && G.g2){ burst(12, cx, cy, t, { type: 'rect', colors: [3, 2, -2, 0], v: 0.26, vy: -0.14, life: 800, r: 3.8, g: 0.0006 }); G.landRings.push({ x: cx, y: cy, r: r.h * 0.62, t0: t, col: 2 }); }   // G2: закрытие заказа — отдельный праздник
       Audio.order(delay(t)); nudgeAt(t); if (J2) buzzAt(t, CFG.J2_BUZZ_ORDER);   // royal: заказ закрыт — единственный мягкий толчок; v2 — и импульс
       tc += CFG.ORDER_DONE_MS / ts; const t2 = tc;
       vAt(t2, () => { const c = G.view.cards[e.slot]; if (!(c && c.id === e.id)) return;
@@ -2178,7 +2204,8 @@ function scheduleDelivery(T, color, tL, evs){
       vAt(t, () => { const c = s.queue[id], V = G.view; let from = null;
         if (ROYAL){ const gg = geo(), L = ordersLayout(gg); if (L.next && V.oi === id) from = { x: easeX('n' + id, L.next.x, t), y: L.next.y, w: L.next.w, h: L.next.h, f: L.f }; }   // royal: растёт из карточки «следующий»
         V.cards[e.slot] = { id, c, f: c.map(() => false), pop: c.map(() => 0), born: t, done: 0, from }; V.oi = Math.max(V.oi, id + 1);
-        if (ROYAL && s.queue[V.oi]){ const gg = geo(); G.ordX['n' + V.oi] = { from: gg.px + gg.pw - 30, to: null, t0: t }; V.nextT = t; } });   // новый «следующий» въезжает справа
+        if (ROYAL && s.queue[V.oi]){ const gg = geo(); G.ordX['n' + V.oi] = { from: gg.px + gg.pw - 30, to: null, t0: t }; V.nextT = t; }
+        if (G2 && G.g2) Audio.g2new(R_ORD.grow / 1000 / ts * 0.9); });   // новый «следующий» въезжает справа
       tc += (ROYAL ? R_ORD.grow : CFG.ORDER_IN_MS) / ts;
     } else if (e.type === 'phase'){                // блок: следующий шаг — его плитки впрыгивают на поле (до этого скрыты), звук и искры
       const t = tc + 160 / ts; G.phaseIn = { t0: t, cells: e.cells.slice() };
@@ -2200,6 +2227,7 @@ function scheduleDelivery(T, color, tL, evs){
 // --- бустеры и «Продолжить» ---
 function useBoost(kind){
   if (!G.s || G.screen !== 'game' || G.paused || G.ending || isWin(G.s) || isLose(G.s)) return false;
+  if (g2IntroTap()) return false;
   if (kind === 'undo' && !G.hist.length){ toast('Nothing to undo'); Audio.nope(); log('event', 'boost.none', kind); return false; }   // нечего отменять — не тратится и не продаётся
   if ((G.save.boost[kind] || 0) <= 0){ G.offer = kind; adOffer(kind); goto('offer'); return false; }
   if (kind === 'undo'){ G.save.boost.undo--; save(); log('event', 'boost.use', 'undo left=' + G.save.boost.undo); undo(); return true; }
@@ -2478,6 +2506,7 @@ function cellAt(p){
 cv.addEventListener('pointerdown', (e) => {
   Audio.init();
   if (!G.s || G.screen !== 'game' || G.paused || G.drag) return;
+  if (g2IntroTap()){ G.lastInputT = clock(); return; }   // G2: интро заказов — касание пропускает его, полю не отдаётся
   if (adSlotOpen(G.s)){ const v = toVirtual(e), q = trayXY(G.s.cap, geo()); if (Math.hypot(v.x - q.x, v.y - q.y) <= q.r + 9){ log('input', 'tap', 'ad-slot'); offerTraySlot(); return; } }
   const i = cellAt(toVirtual(e));
   if (i < 0 || G.s.grid[i] <= 0) return;
@@ -3140,26 +3169,40 @@ function drawCard(c, x, y, w, h, done, lw){
 // закрытое — фишка с галочкой. Ящики — такая же карточка: фишка-ящик и «сломано/нужно». Следом маленькая карточка — следующий заказ.
 // hl — место, куда попадёт фигура, если отпустить плитку сейчас (target из ядра): оно пульсирует. На старте уровня карточки трижды пульсируют.
 // Связь «карточка ↔ поле»: плитки, чья фигура нужна открытой карточке, на поле сделаны из того же материала (бумага + акцентная кромка, см. drawPiece).
-function drawOrders(c, g, now, hl){
+function drawOrders(c, g, now, hl, introPass){
   const s = G.s, V = G.view, ts = G.timeScale, L = ordersLayout(g), step = CHIP_STEP * L.f, cr = CHIP_R * L.f;
-  const intro = now < G.levelT0 + 1300 ? Math.max(0, Math.sin((now - G.levelT0) / 1300 * Math.PI * 3)) : 0;
+  const intro = now < G.levelT0 + 1300 && !(G.g2 && G.g2.intro) && !introPass ? Math.max(0, Math.sin((now - G.levelT0) / 1300 * Math.PI * 3)) : 0;
   if (ROYAL && G.baseKey) {}                       // royal: панель уже в слое royalBase
   else {
   c.fillStyle = P.goalShadow; rr(c, g.px, g.py + 5, g.pw, PANEL_H, 20); c.fill();        // панель цели: свой тон и кромка — не путается с полем
   c.fillStyle = P.goal; rr(c, g.px, g.py, g.pw, PANEL_H, 20); c.fill();
   c.strokeStyle = P.goalRim; c.lineWidth = 2; rr(c, g.px + 1, g.py + 1, g.pw - 2, PANEL_H - 2, 19); c.stroke();
   }
+  // G2, интро уровня: в обычном проходе открытые карточки не рисуются, во втором (introPass, поверх приглушённого поля) — только они: крупно по центру, столбиком, потом едут в панель
+  const IN = g2On(s) ? g2IntroState(now) : null, XF = {};
+  if (IN && introPass){
+    const ids = []; for (let a = 0; a < s.show; a++) if (V.cards[a] && L.cards[a]) ids.push(a);
+    ids.sort((p, q) => L.cards[p].x - L.cards[q].x);
+    const maxW = ids.reduce((m, a) => Math.max(m, L.cards[a].w), 1), S = Math.min(CFG.G2_INTRO_SCALE, (W - 56) / maxW), row = ORD_H * S + 16, y0 = g.oy + g.bh * 0.42, n = ids.length;
+    ids.forEach((a, j) => { const ap = Math.max(0, Math.min(1, (IN.t - 70 * j) / CFG.G2_INTRO_IN)), p = easeIO(Math.max(0, Math.min(1, IN.fly * (1 + 0.16 * (n - 1)) - 0.16 * j)));
+      XF[a] = { p, x0: W / 2, y0: y0 + (j - (n - 1) / 2) * row, sc: (S + (1 - S) * p) * (REDUCED ? 1 : (0.55 + 0.45 * backOut(ap)) * (1 + 0.018 * Math.sin(now / 240 + j) * (1 - p))), al: Math.min(1, ap * 2.5) }; });
+  }
   for (let a = 0; a < s.show; a++){
     const card = V.cards[a], r = L.cards[a];
     if (!card || !r) continue;                                   // очередь кончилась — пустое место не рисуем
+    if (introPass ? !XF[a] : !!IN) continue;
+    const g2 = g2On(s);
     const grow = ROYAL && card.from && card.born && now < card.born + R_ORD.grow / ts ? easeIO((now - card.born) / (R_ORD.grow / ts)) : -1;
     if (grow >= 0){                                  // royal: карточка «следующий» вырастает в полную и едет на своё место
       const F = card.from, n = card.c.length, rx = easeX('c' + card.id, r.x, now), x = F.x + (rx - F.x) * grow, y = F.y + (r.y - F.y) * grow, w = F.w + (r.w - F.w) * grow, h = F.h + (r.h - F.h) * grow;
       const cyy = y + h / 2, cxx = x + w / 2, st2 = NEXT_R.step * F.f + (step - NEXT_R.step * F.f) * grow, rad = NEXT_R.r * 0.72 * F.f + (cr * 0.82 - NEXT_R.r * 0.72 * F.f) * grow;
-      drawCard(c, x, y, w, h, false, 3);
+      const pk = g2 && !REDUCED ? 1 + 0.28 * Math.sin(Math.PI * grow) : 1;   // G2: новый заказ всплывает крупнее и садится на место
+      c.save(); c.translate(cxx, cyy - (pk - 1) * 44); c.scale(pk, pk); c.translate(-cxx, -cyy);
+      drawCard(c, x, y, w, h, false, g2 ? 3 + 2.4 * Math.sin(Math.PI * grow) : 3);
       card.c.forEach((col, i) => { const px = cxx - st2 * (n - 1) / 2 + st2 * i;
         c.save(); c.globalAlpha = grow; c.fillStyle = P.pSlot; c.beginPath(); c.arc(px, cyy, cr * grow, 0, Math.PI * 2); c.fill(); c.restore();
         drawShape(c, col, px, cyy + grow, rad); });
+      c.restore();
       continue;
     }
     const x = easeX('c' + card.id, r.x, now), cx = x + r.w / 2, cy = r.y + r.h / 2, n = card.c.length;
@@ -3167,36 +3210,54 @@ function drawOrders(c, g, now, hl){
     if (card.done) k = 1 + 0.14 * Math.sin(Math.min(1, (now - card.done) / (CFG.ORDER_DONE_MS / ts)) * Math.PI);
     else if (card.born && !(ROYAL && card.from) && now < card.born + CFG.ORDER_IN_MS / ts) k = 0.55 + 0.45 * backOut((now - card.born) / (CFG.ORDER_IN_MS / ts));
     if (J2 && !REDUCED && !card.done && card.land && now >= card.land && now < card.land + 140 / ts) k *= 1 + CFG.J2_CARD_K * Math.sin(Math.PI * (now - card.land) / (140 / ts));   // v2: карточка вздрагивает от посадки
-    c.save(); c.translate(cx, cy); c.scale(k, k); c.translate(-cx, -cy);
-    const g2 = g2On(s), fin = g2 && !card.done && G.g2.finalId === card.id, lastFig = g2 && G.g2.said && G.g2.total - G.g2.shown === 1;   // G2: последний заказ — золотая кромка и флажок; последняя фигура — лучи за местом
+    const tl = g2 && card.land ? (now - card.land) * ts : 1e9, hit = tl >= 0 && tl < 330 && !REDUCED && !card.done, he = hit ? Math.exp(-tl / 85) * Math.cos(tl / 36) : 0;   // G2: удар прилёта — карточка сжимается и пружинит
+    if (g2 && card.from && card.born && !REDUCED){ const tb = (now - card.born) * ts - R_ORD.grow; if (tb >= 0 && tb < 300) k *= 1 + 0.07 * Math.exp(-tb / 80) * Math.cos(tb / 36); }   // новый заказ сел — качнулся
+    const X = introPass ? XF[a] : null;
+    c.save(); if (X) c.globalAlpha = X.al;
+    c.translate(X ? X.x0 + (cx - X.x0) * X.p : cx, (X ? X.y0 + (cy - X.y0) * X.p : cy) - (hit ? 4 * Math.sin(Math.PI * Math.min(1, tl / 170)) : 0)); c.scale(k * (X ? X.sc : 1) * (1 + 0.05 * he), k * (X ? X.sc : 1) * (1 - CFG.G2_LAND_SQ * he)); c.translate(-cx, -cy);
+    const fin = g2 && !card.done && G.g2.final && !introPass, lastFig = g2 && G.g2.said && G.g2.total - G.g2.shown === 1;   // G2: последний заказ — золотая кромка и флажок; последняя фигура — лучи за местом
     if (fin && !REDUCED){ const fb = 0.5 + 0.5 * Math.sin(now / 210), gl = c.createRadialGradient(cx, cy, r.h * 0.3, cx, cy, r.w * 0.5 + 26);
       gl.addColorStop(0, 'rgba(255,205,60,' + (0.5 + 0.25 * fb).toFixed(3) + ')'); gl.addColorStop(1, 'rgba(255,205,60,0)'); c.fillStyle = gl; c.fillRect(x - 28, r.y - 24, r.w + 56, r.h + 48); }
     drawCard(c, x, r.y, r.w, r.h, card.done, fin ? 5.2 + 1.2 * Math.sin(now / 210) : 3 + 2.5 * intro);
     card.c.forEach((col, i) => {
       const px = cx - step * (n - 1) / 2 + step * i;
+      let hop = 0;                                   // G2: соседние места подпрыгивают от прилёта; при закрытии заказа галочки прыгают волной
+      if (g2 && !REDUCED){ if (card.done){ const u = ((now - card.done) * ts - 55 * i) / 230; if (u > 0 && u < 1) hop = -6 * Math.sin(Math.PI * u); }
+        else if (hit && card.landK != null && i !== card.landK){ const u = (tl - 45 * Math.abs(i - card.landK)) / 210; if (u > 0 && u < 1) hop = -CFG.G2_HOP_PX * Math.sin(Math.PI * u); } }
+      if (hop) c.translate(0, hop);
       if (card.f[i]){
         const pt = now - card.pop[i], pop = J2 ? (pt >= 0 && pt < CFG.J2_LAND_MS / ts && !REDUCED ? 1 + CFG.J2_CHIP_POP * Math.exp(-pt * ts / 70) * Math.cos(pt * ts / 40) : 1) : 1 + 0.35 * Math.max(0, 1 - pt / 300);   // v2: фишка подпрыгивает и качается с затуханием
-        if (g2){ drawG2Done(c, col, px, cy, cr, pop, pt, ts); return; }
+        if (g2){ drawG2Done(c, col, px, cy, cr, pop, pt, ts);
+          const ft = pt * ts; if (ft >= 0 && ft < 220 && !REDUCED){ const fu = ft / 220, fr = cr * (1.25 + 1.3 * fu), fg = c.createRadialGradient(px, cy, 0, px, cy, fr);   // вспышка места
+            fg.addColorStop(0, 'rgba(255,255,255,' + (0.9 * (1 - fu)).toFixed(3) + ')'); fg.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = fg; c.beginPath(); c.arc(px, cy, fr, 0, Math.PI * 2); c.fill(); }
+          if (hop) c.translate(0, -hop); return; }
         drawChip(c, col, px, cy, cr, pop); drawCheckBadge(c, px + cr * 0.72, cy + cr * 0.72, cr * 0.4);
         return;
       }
-      if (lastFig && !card.done) drawG2Rays(c, px, cy, cr, now);
+      if (lastFig && !card.done && !introPass) drawG2Rays(c, px, cy, cr, now);
       c.fillStyle = P.pSlot; c.beginPath(); c.arc(px, cy, cr, 0, Math.PI * 2); c.fill();                       // пустое место — утопленная лунка (без пунктира-«строчки»)
       if (!ROYAL){ c.save(); c.globalAlpha = 0.28; c.strokeStyle = P.pInk; c.lineWidth = 2.5; c.beginPath(); c.arc(px, cy + 1, cr - 1.5, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); c.restore(); }   // тень по верхней кромке лунки
       drawShape(c, col, px, cy + 1, cr * (ROYAL ? 0.82 : 0.7));                      // royal: фишки заказа крупные
       if (hl && hl.slot === a && hl.k === i && hl.id === card.id){
         c.save(); c.globalAlpha = 0.6 + 0.4 * Math.sin(now / 90); c.strokeStyle = P.ok; c.lineWidth = g2 ? 5 : 4; c.beginPath(); c.arc(px, cy, cr + 4, 0, Math.PI * 2); c.stroke(); c.restore();
       }
+      if (hop) c.translate(0, -hop);
     });
-    if (fin) g2Flag(c, x + r.w - 5, r.y + 7, 1.2);   // G2: последний заказ уровня — финишный флажок на углу карточки
+    if (g2 && card.done && !REDUCED){ const su = (now - card.done) * ts / 300; if (su > 0 && su < 1){ const sx = x - 30 + (r.w + 60) * su, sg = c.createLinearGradient(sx - 24, 0, sx + 24, 0);   // закрытый заказ: блик пробегает по карточке
+      sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(0.5, 'rgba(255,255,255,0.85)'); sg.addColorStop(1, 'rgba(255,255,255,0)'); c.save(); rr(c, x, r.y, r.w, r.h, 14); c.clip(); c.fillStyle = sg; c.fillRect(sx - 24, r.y, 48, r.h); c.restore(); } }
+    if (fin) g2Flag(c, x + r.w - 5, r.y + 7, 1.2);   // G2: очередь кончилась — финишный флажок на углу оставшихся карточек
     c.restore();
   }
+  if (introPass) return;
   if (G.leaving.length){                           // royal: закрытые заказы уезжают вверх, уменьшаясь и тая
     G.leaving = G.leaving.filter(q => now < q.t + R_ORD.leave / ts);
     for (const q of G.leaving){
-      const u = easeIO((now - q.t) / (R_ORD.leave / ts)), cx = q.x + q.w / 2, cy = q.y + q.h / 2 - 46 * u, k = 1 - 0.5 * u, n = q.card.c.length, st = CHIP_STEP * q.f;
-      c.save(); c.globalAlpha = 1 - u; c.translate(cx, cy); c.scale(k, k); c.translate(-cx, -cy);
+      const g2l = g2On(s) && !REDUCED, ur = (now - q.t) / (R_ORD.leave / ts), pa = Math.min(1, ur / 0.3), pb = Math.max(0, (ur - 0.3) / 0.7);   // G2: карточка приседает и лопается (на месте — вверху ей некуда лететь)
+      const u = easeIO(ur), cx = q.x + q.w / 2, cy = q.y + q.h / 2 - (g2l ? 8 * ease(pb) : 46 * u), k = g2l ? (pb <= 0 ? 1 - 0.1 * Math.sin(pa * Math.PI / 2) : 0.9 + 0.48 * ease(pb)) : 1 - 0.5 * u, n = q.card.c.length, st = CHIP_STEP * q.f;
+      if (g2l && !q.pop && pb > 0){ q.pop = true; burst(14, cx, cy, now, { type: 'star', color: -2, v: 0.24, life: 520, r: 6.5, g: 0 }); burst(16, cx, cy, now, { type: 'rect', colors: [3, 2, -2, 3], v: 0.3, vy: -0.12, life: 820, r: 4, g: 0.0006 }); Audio.g2pop(); }
+      c.save(); c.globalAlpha = g2l ? Math.max(0, 1 - pb * 1.5) : 1 - u; c.translate(cx, cy); c.scale(k, k); c.translate(-cx, -cy);
       drawCard(c, cx - q.w / 2, cy - q.h / 2, q.w, q.h, true, 3);
+      if (g2l && pb > 0 && pb < 0.45){ c.fillStyle = 'rgba(255,255,255,' + (0.85 * (1 - pb / 0.45)).toFixed(3) + ')'; rr(c, cx - q.w / 2, cy - q.h / 2, q.w, q.h, 14); c.fill(); }
       q.card.c.forEach((col, i) => { const px = cx - st * (n - 1) / 2 + st * i; if (g2On(s)){ drawG2Done(c, col, px, cy, CHIP_R * q.f, 1, 1e9, ts); return; } drawChip(c, col, px, cy, CHIP_R * q.f); drawCheckBadge(c, px + CHIP_R * q.f * 0.72, cy + CHIP_R * q.f * 0.72, CHIP_R * q.f * 0.4); });
       c.restore();
     }
@@ -3217,6 +3278,7 @@ function drawOrders(c, g, now, hl){
     const nIn = ROYAL && V.nextT ? Math.min(1, (now - V.nextT) / (R_ORD.shift / ts)) : 1; c.save(); c.globalAlpha = nIn;   // royal: новый «следующий» проявляется, въезжая
     if (ROYAL){                                       // холодный карман: тон поля, внутренняя тень сверху, тонкое золото — «потом», но не сливается с кремовой панелью
       const rad = 11 * L.f, gr = c.createLinearGradient(0, r.y, 0, r.y + r.h); gr.addColorStop(0, TH.pocketTop); gr.addColorStop(1, TH.pocketBot);
+      if (g2On(s) && CFG.G2_QUEUE_COUNT) for (let q = Math.min(2, more); q >= 1; q--){ c.fillStyle = TH.pocketBot; rr(c, x + 3.6 * q, r.y - 2.6 * q, r.w, r.h, rad); c.fill(); c.strokeStyle = TH.pocketLine; c.lineWidth = 1.2; c.stroke(); }   // G2: карман стопкой — сколько заказов ещё в очереди
       c.fillStyle = gr; rr(c, x, r.y, r.w, r.h, rad); c.fill();
       c.save(); rr(c, x, r.y, r.w, r.h, rad); c.clip(); c.fillStyle = TH.pocketShade; rr(c, x - 2, r.y - 4, r.w + 4, 8, 4); c.fill(); c.restore();
       c.strokeStyle = TH.pocketLine; c.lineWidth = 1.6; rr(c, x + 0.8, r.y + 0.8, r.w - 1.6, r.h - 1.6, rad - 0.8); c.stroke();
@@ -3228,7 +3290,8 @@ function drawOrders(c, g, now, hl){
     }
     if (more > 0 && !(g2On(s) && !CFG.G2_QUEUE_COUNT)){   // G2: «сколько осталось» несёт одно число — у флажка на ленте
       const bump = ROYAL && V.nextT && now - V.nextT < 420 ? 1 + 0.45 * Math.sin((now - V.nextT) / 420 * Math.PI) : 1, bx = x + r.w - 2, by = r.y - (bump - 1) * 8;   // royal: «+N» уменьшилось — подскок
-      c.save(); c.translate(bx, by); c.scale(bump, bump);
+      const qs = g2On(s) ? 1.28 : 1;                  // G2: «+N» крупнее — это единственный счётчик «сколько ещё»
+      c.save(); c.translate(bx + (qs - 1) * 4, by - (qs - 1) * 3); c.scale(bump * qs, bump * qs);
       if (ROYAL){                                     // золотая монетка с тёмной цифрой
         const gg = c.createLinearGradient(0, -11, 0, 11); gg.addColorStop(0, TH.coinTop); gg.addColorStop(1, TH.coinBot);
         c.fillStyle = 'rgba(120,70,10,0.35)'; c.beginPath(); c.arc(0, 1.5, 11, 0, Math.PI * 2); c.fill();
@@ -3322,10 +3385,39 @@ function drawTray(c, g, now, kind){
 // 3. Проигрыш близко: поле — три ступени по свободным клеткам (янтарная кромка → красная кромка, счётчик клеток, стук сердца → быстрый пульс);
 //    лоток — одно место: янтарный отсвет сверху на поле (разово), полон: красный отсвет держится. Причины разведены: поле — контур, лоток — сверху.
 function g2Reset(){
-  G.g2 = { shown: -1, total: 0, sparks: [], fromF: 0, toF: 0, fT: -1e9, tickT: -1e9, said: false, lastT: -1e9, finalId: -1, finalT: -1e9,
-    stage: 0, stageT: -1e9, beatAt: 0, tray: 0, trayT: -1e9 };
+  const s = G.s, intro = G2 && CFG.G2_INTRO && !!s && s.every > 0 && s.li + 1 >= CFG.G2_INTRO_FROM && !(TUT_ON && TUT.q.length);
+  G.g2 = { shown: -1, total: 0, sparks: [], fromF: 0, toF: 0, fT: -1e9, tickT: -1e9, said: false, lastT: -1e9, final: false, finalT: -1e9,
+    stage: 0, stageT: -1e9, beatAt: 0, tray: 0, trayT: -1e9, intro, introT0: clock(), introFly: -1, introFast: false, introSeat: false };
+  if (intro) log('fx.start', 'goal.intro', 'level=' + (s.li + 1));
 }
-function g2On(s){ return G2 && !!s && s.every > 0 && !!G.g2 && !!G.view; }   // уроки без раздачи (1–2 фигуры) — без ленты и тревоги
+// Интро уровня: null — не идёт; иначе { t — мс от старта, appear 0…1, fly 0…1 (переезд в панель) }. Время игровое (clock), на паузе стоит.
+function g2IntroState(now){
+  const Z = G.g2; if (!Z || !Z.intro) return null;
+  if (!LOADER.ready) Z.introT0 = now;             // первый запуск: пока заставка не ушла, интро не начинается (иначе его не видно)
+  const t = (now - Z.introT0) * G.timeScale, f0 = Z.introFly >= 0 ? Z.introFly : CFG.G2_INTRO_IN + CFG.G2_INTRO_HOLD, fm = Z.introFast ? CFG.G2_INTRO_FAST : CFG.G2_INTRO_FLY;
+  if (t >= f0 + fm){ Z.intro = false; G.lastInputT = now; log('fx.end', 'goal.intro'); return null; }
+  if (t >= f0 && !Z.introSeat){ Z.introSeat = true; Audio.whoosh(0, fm * 0.8); Audio.g2seat(fm / 1000 * 0.92); }
+  return { t, appear: Math.min(1, t / CFG.G2_INTRO_IN), fly: t < f0 ? 0 : (t - f0) / fm };
+}
+// Касание во время интро: пропуск — карточки сразу едут на места (быстро). Возвращает true, если интро ещё идёт (ввод полю не отдаём).
+function g2IntroTap(){
+  const Z = G.g2; if (!G2 || !Z || !Z.intro) return false;
+  const t = (clock() - Z.introT0) * G.timeScale;
+  if (t >= CFG.G2_INTRO_SKIP_AT && Z.introFly < 0 && t < CFG.G2_INTRO_IN + CFG.G2_INTRO_HOLD){ Z.introFly = t; Z.introFast = true; log('input', 'skip', 'goal.intro'); }
+  return true;
+}
+// Новый ход догнал вид до ядра, а фигура прошлого хода ещё летит: её место остаётся пустым до посадки (иначе галочка появлялась бы раньше фигуры).
+function g2CarryFlights(){
+  const now = clock(), V = G.view; if (!V) return;
+  for (const M of G.merges){
+    if (!M.g2f || now >= M.flyEnd || now < M.t0) continue;
+    const T = M.target, cd = V.cards[T.slot]; if (!cd || cd.id !== T.id || !cd.f[T.k]) continue;
+    cd.f[T.k] = false; const tL = M.flyEnd;
+    vAt(tL, () => { const cc = G.view.cards[T.slot]; if (cc && cc.id === T.id && !cc.f[T.k]){ cc.f[T.k] = true; cc.pop[T.k] = tL; cc.land = tL; cc.landK = T.k; Audio.g2stamp(CFG.G2_STAMP_AT / 1000 / G.timeScale); } });
+  }
+}
+function g2On(s){ return G2 && !!s && !!G.g2 && !!G.view; }            // штамп, полёт, ответ карточки — на всех уровнях
+function g2Deal(s){ return g2On(s) && s.every > 0; }                    // тревога, финал, «Last one!», интро — только на уровнях с раздачей
 function g2Total(s){ return s.total + s.crateGoal; }
 function g2Frac(now){ const Z = G.g2; return Z.fromF + (Z.toF - Z.fromF) * easeIO((now - Z.fT) / (CFG.G2_FILL_MS / G.timeScale)); }
 // Лента лежит на верхней кромке рамы поля (место между панелью цели и полем есть на любом экране); справа — медальон с флажком.
@@ -3336,7 +3428,7 @@ function g2BarRect(g){
   return { x, y, w, h, sx: x + w + R * 0.5, sy: y + h / 2 - 1, R };
 }
 function g2Spark(T, t){
-  if (!g2On(G.s)) return;
+  if (!g2On(G.s) || !CFG.G2_FLAG) return;
   const p = orderSlotXY(T.slot, T.k, T.n || (G.s.queue[T.id] ? G.s.queue[T.id].length : 1), geo());
   G.g2.sparks.push({ x: p.x, y: p.y, t0: t, t1: t + CFG.G2_SPARK_MS / G.timeScale, hit: false });
 }
@@ -3344,8 +3436,8 @@ function g2Tick(now, n){
   const s = G.s, Z = G.g2, total = Z.total, before = total - Z.shown;
   Z.fromF = g2Frac(now); Z.shown = Math.min(total, Z.shown + n); Z.toF = total ? Z.shown / total : 0; Z.fT = now; Z.tickT = now;
   const left = total - Z.shown, coreLeft = total - goalProgress(s).done;
-  Audio.g2tick(left);
-  if (left === 1 && before > 1 && coreLeft === 1 && total >= CFG.G2_LAST_MIN && !Z.said){   // последняя фигура: один выкрик за уровень
+  if (CFG.G2_FLAG) Audio.g2tick(left);
+  if (left === 1 && before > 1 && coreLeft === 1 && s.every > 0 && total >= CFG.G2_LAST_MIN && !Z.said){   // последняя фигура: один выкрик за уровень
     Z.said = true; Z.lastT = now;
     const g = geo(); G.praise.push({ text: 'Last one!', x: W / 2, y: g.oy + g.cell * 1.1, t0: now, t1: now + 1500 / G.timeScale, color: '#f5a012', size: 36 });
     Audio.g2last(); buzz(14); log('fx.start', 'last.one', 'level=' + (s.li + 1));
@@ -3358,13 +3450,14 @@ function g2Update(now){
   for (const sp of Z.sparks) if (!sp.hit && now >= sp.t1){ sp.hit = true; if (Z.shown < served) g2Tick(now, 1); }
   if (Z.sparks.length) Z.sparks = Z.sparks.filter(sp => !sp.hit);
   if (Z.shown + Z.sparks.length < served) g2Tick(now, served - Z.sparks.length - Z.shown);
-  // последний заказ: в очереди пусто и открыта одна карточка — отмечаем её (звук один раз)
-  const open = V.cards.filter(c => c && !c.done), fin = open.length === 1 && !s.queue[V.oi] && total >= CFG.G2_LAST_MIN ? open[0].id : -1;
-  if (fin >= 0 && Z.finalId !== fin){ Z.finalId = fin; Z.finalT = now; if (total - Z.shown > 1){ Audio.g2final(); log('fx.start', 'last.order', 'id=' + fin); } }
+  // финал: очередь кончилась — всё, что осталось собрать, лежит на столе; оставшиеся карточки отмечаем золотом и флажком (звук один раз)
+  const deal = s.every > 0, open = V.cards.filter(c => c && !c.done), fin = deal && !Z.intro && open.length > 0 && !s.queue[V.oi] && total >= CFG.G2_LAST_MIN;
+  if (fin && !Z.final){ Z.finalT = now; if (total - Z.shown > 1){ Audio.g2final(); log('fx.start', 'last.orders', 'open=' + open.length); } }
+  Z.final = fin;
   // поле: ступень по свободным клеткам
   let empty = 0; for (const c of s.grid) if (c === 0) empty++;
   const live = G.screen === 'game' && !isWin(s) && !isLose(s);
-  const stage = isWin(s) ? 0 : empty <= CFG.G2_CRIT_EMPTY ? 3 : empty <= CFG.G2_DANGER_EMPTY ? 2 : empty <= CFG.G2_WARN_EMPTY ? 1 : 0;
+  const stage = isWin(s) || !deal ? 0 : empty <= CFG.G2_CRIT_EMPTY ? 3 : empty <= CFG.G2_DANGER_EMPTY ? 2 : empty <= CFG.G2_WARN_EMPTY ? 1 : 0;
   if (stage !== Z.stage){
     if (stage > Z.stage && live){ Z.stageT = now; Audio.g2warn(stage); if (stage >= 2) buzz(stage === 3 ? 22 : 16); log('fx.start', 'danger.board', 'stage=' + stage + ' empty=' + empty); }
     Z.stage = stage; Z.beatAt = now + 500 / G.timeScale;
@@ -3372,7 +3465,7 @@ function g2Update(now){
   Z.empty = empty;
   if (stage >= 2 && live && now >= Z.beatAt){ Audio.g2beat(stage === 3); Z.beatAt = now + (stage === 3 ? CFG.G2_BEAT_FAST : CFG.G2_BEAT_MS) / G.timeScale; }
   // лоток: 1 — осталось одно место, 2 — полон (по виду: фигура уже легла)
-  const tn = V.tray.length, tray = tn >= s.cap ? 2 : tn === s.cap - 1 ? 1 : 0;
+  const tn = V.tray.length, tray = !deal ? 0 : tn >= s.cap ? 2 : tn === s.cap - 1 ? 1 : 0;
   if (tray !== Z.tray){
     if (tray > Z.tray && live){ Z.trayT = now; Audio.g2warn(tray === 2 ? 2 : 1); if (tray === 2) buzz(18); log('fx.start', 'danger.tray', 'state=' + tray); }
     Z.tray = tray;
@@ -3446,6 +3539,33 @@ function drawG2Bar(c, g, now){
     for (let q = 3; q >= 0; q--){ const v = Math.max(0, e - q * 0.07), a = (1 - v) * (1 - v), b = 2 * v * (1 - v), d = v * v;
       c.save(); c.globalAlpha = (1 - q * 0.24) * (u < 0.15 ? u / 0.15 : 1); sparkIconFill(c, a * sp.x + b * mx + d * hx, a * sp.y + b * my + d * hy, (7 - q * 1.3), q ? '#ffe27a' : '#ffffff'); c.restore(); }
   }
+}
+// Полёт в заказ под G2: целая фигура, без кувырка. q — доля времени полёта: сначала подъём на месте (вырастает), потом плавная дуга вбок (к центру экрана),
+// в последней трети фигура уменьшается до места в заказе. Темп читаемый (G2_FLY_MS), ввод полёт не блокирует.
+function g2FlyAt(sp, x0, y0, R, q){
+  const la = CFG.G2_FLY_LIFT / CFG.G2_FLY_MS, big = CFG.G2_FLY_BIG;
+  if (q < la){ const e = backOut(q / la); return { x: x0, y: y0 - 10 * e, r: R * (1 + (big - 1) * e), tilt: 0, e: 0 }; }
+  const u = (q - la) / (1 - la), e = u * u * (3 - 2 * u), side = (x0 + sp.x) / 2 < W / 2 ? 1 : -1;
+  const arc = Math.max(34, Math.min(84, Math.hypot(sp.x - x0, sp.y - y0) * CFG.G2_FLY_ARC)) * side, sh = e < 0.6 ? 0 : (e - 0.6) / 0.4, s2 = sh * sh * (3 - 2 * sh);
+  return { x: x0 + (sp.x - x0) * e + Math.sin(e * Math.PI) * arc, y: y0 - 10 + (sp.y - y0 + 10) * e, r: R * big + (sp.r * 0.8 - R * big) * s2, tilt: Math.sin(e * Math.PI) * 0.14 * side, e };
+}
+function drawG2Flight(c, g, M, now, x0, y0, R){
+  const sp = targetXY(M.target, g), q = Math.max(0, Math.min(1, (now - M.t1) / (M.flyEnd - M.t1))), A = g2FlyAt(sp, x0, y0, R, q), la = CFG.G2_FLY_LIFT / CFG.G2_FLY_MS;
+  if (!REDUCED){
+    c.save(); c.fillStyle = P.colors[M.color] || '#ffffff';                       // короткий хвост цвета фигуры
+    for (let k = CFG.G2_COMET_N; k >= 1; k--){ const qk = q - k * 0.024; if (qk <= la) continue; const B = g2FlyAt(sp, x0, y0, R, qk);
+      c.globalAlpha = 0.3 * (1 - k / (CFG.G2_COMET_N + 1)); c.beginPath(); c.arc(B.x, B.y, Math.max(2, B.r * (0.66 - 0.07 * k)), 0, Math.PI * 2); c.fill(); }
+    c.globalAlpha = 0.16 * (1 - A.e); c.fillStyle = 'rgb(20,40,90)'; c.beginPath(); c.ellipse(A.x + 3, A.y + A.r * 0.92 + 7, A.r * 0.78, A.r * 0.26, 0, 0, Math.PI * 2); c.fill();   // тень: фигуру «подняли»
+    c.restore();
+  }
+  c.save(); c.translate(A.x, A.y); c.rotate(A.tilt); drawShape(c, M.color, 0, 0, A.r);
+  if (CANDY) candyGlint(c, M.color, 0, 0, A.r, (q * 2) % 1, 0.5);
+  c.restore();
+}
+// Приглушение поля на интро уровня: тёмная плашка по раме поля (карточки заказов рисуются поверх неё отдельным проходом drawOrders).
+function drawG2IntroDim(c, g, IN){
+  const a = CFG.G2_INTRO_DIM * Math.min(1, IN.appear * 1.4) * (1 - easeIO(IN.fly)); if (a <= 0.004) return;
+  c.save(); c.fillStyle = 'rgba(' + TH.dim + ',' + a.toFixed(3) + ')'; rr(c, g.ox - 12, g.oy - 12, g.bw + 24, g.bh + 24, 24); c.fill(); c.restore();
 }
 // Место в заказе под G2: закрытое — фишка гаснет, поверх крупная зелёная галочка-штамп (падает с перелётом); st < 0 — ещё яркая, только что села.
 function drawG2Done(c, col, px, cy, cr, pop, pt, ts){
@@ -3697,7 +3817,7 @@ function render(){
   if (tjk !== 1) ctx.restore();
   if (wob) ctx.restore();
   if (ROYAL) drawTraySweep(ctx, g, now);
-  if (g2) drawG2Bar(ctx, g, now);
+  if (g2 && CFG.G2_FLAG) drawG2Bar(ctx, g, now);
   if (G.landRings.length) drawLandRings(ctx, now);
   // подсказка при бездействии: плитка с готовой стыковкой подмигивает в сторону пары (ход ядра, не догадка)
   let hintCell = -1, hintDir = 0, hintK = 0;
@@ -3928,18 +4048,13 @@ function render(){
       const v = M.magnet ? u : (u - 0.45) / 0.55, pulse = 1 + (0.35 + 0.05 * Math.min(4, M.combo)) * Math.sin(Math.min(1, v * 1.6) * Math.PI);
       drawBurst(ctx, edgeX, cy, R, M.color, v, Math.min(4, M.combo));
       ctx.save(); ctx.translate(edgeX, cy); ctx.rotate(Math.sin(v * Math.PI * 2) * 0.12 * (1 - v)); drawShape(ctx, M.color, 0, 0, R * pulse); ctx.restore();
+    } else if (M.g2f){ drawG2Flight(ctx, g, M, now, edgeX, cy, R);
     } else {
       const FE = J2 ? (q) => { q = q < 0 ? 0 : q > 1 ? 1 : q; return 1 - Math.pow(1 - q, 2.2); } : easeIO;   // v2: быстрый взлёт и мягкий подлёт (раньше — медленный старт: фигура «висела» у поля)
       const v = FE((now - M.t1) / (M.flyEnd - M.t1)), sp = targetXY(M.target, g);
       if (M.target.kind === 'bonus'){ ctx.save(); ctx.globalAlpha = 1 - v; drawShape(ctx, M.color, edgeX, cy - v * 40, R * (1 - v * 0.6)); ctx.restore(); continue; }
       const arc = J2 ? Math.max(24, Math.min(60, Math.hypot(sp.x - edgeX, sp.y - cy) * CFG.J2_FLY_ARC)) : 60, grow = J2 && !REDUCED ? CFG.J2_FLY_GROW : 0;
       const x = edgeX + (sp.x - edgeX) * v, y = cy + (sp.y - cy) * v - Math.sin(v * Math.PI) * arc;
-      if (g2 && M.target.kind === 'order' && !REDUCED){   // G2: короткий хвост кометы цвета фигуры — глаз идёт за ней к заказу (в лоток — без хвоста)
-        ctx.save(); ctx.fillStyle = P.colors[M.color] || '#ffffff';
-        for (let k = CFG.G2_COMET_N; k >= 1; k--){ const vk = FE((now - M.t1 - k * 11 / G.timeScale) / (M.flyEnd - M.t1)); if (vk <= 0) continue;
-          ctx.globalAlpha = 0.5 * (1 - k / (CFG.G2_COMET_N + 1)); ctx.beginPath(); ctx.arc(edgeX + (sp.x - edgeX) * vk, cy + (sp.y - cy) * vk - Math.sin(vk * Math.PI) * arc, Math.max(2, (R + (sp.r - R) * vk) * (0.6 - 0.05 * k)), 0, Math.PI * 2); ctx.fill(); }
-        ctx.restore();
-      }
       ctx.save(); ctx.globalAlpha = J2 ? 0.26 : 0.3; for (let k = 1; k <= (J2 ? 2 : 3); k++){ const vk = FE((now - M.t1 - k * (J2 ? 20 : 30)) / (M.flyEnd - M.t1)); if (vk <= 0) continue;   // v2: при быстром взлёте копии разлетались — две и ближе
         drawShape(ctx, M.color, edgeX + (sp.x - edgeX) * vk, cy + (sp.y - cy) * vk - Math.sin(vk * Math.PI) * arc, (R + (sp.r - R) * vk) * (1 - k * 0.15) * (1 + grow * Math.sin(vk * Math.PI))); }
       ctx.restore();
@@ -3980,6 +4095,7 @@ function render(){
       drawHand(ctx, a.x + cs * 0.5, a.y + cs * 0.55, b.x - a.x, b.y - a.y, now - G.handT0);
     }
   }
+  if (g2){ const IN = g2IntroState(now); if (IN){ drawG2IntroDim(ctx, g, IN); drawOrders(ctx, g, now, null, true); } }   // G2: интро заказов — поверх приглушённого поля
   // журнал fx.end и финал — по состоянию в кадре, не по событию (урок «Стыковки»)
   if (G.fxOpen.length){ const keep = []; for (const f of G.fxOpen){ if (now >= f.t1) log('fx.end', f.name); else keep.push(f); } G.fxOpen = keep; }
   if (G.screen === 'game' && !G.ending && (isWin(s) || isLose(s)) && now >= G.fxUntil) G.ending = now + (isWin(s) ? 0 : CFG.END_DELAY_MS);
