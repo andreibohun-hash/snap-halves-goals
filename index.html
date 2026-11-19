@@ -118,6 +118,8 @@ button.big{font-size:22px;font-weight:1000;padding:16px 26px;border-radius:18px;
 .levels button small{display:block;font-size:10px;color:var(--c2)}
 .levels button.locked{opacity:.4}
 .levels button.hard{box-shadow:inset 0 0 0 2px var(--danger)}
+.levels.lab{grid-template-columns:repeat(4,1fr);max-height:52vh}
+.levels button em{display:block;font-style:normal;font-size:8.5px;line-height:1.1;font-weight:700;color:var(--muted);margin-top:2px;padding:0 2px;overflow:hidden;max-height:2.3em}
 .card .note{font-size:13px;color:var(--muted);margin:-8px 0 14px}
 .cheat{margin-top:10px;font-size:12px;padding:6px 10px;background:transparent;border:1.5px dashed var(--muted);color:var(--muted)}
 #toast{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:var(--frame);padding:8px 14px;border-radius:10px;
@@ -196,6 +198,7 @@ html[data-skin=royal] .rl-ribbon.fail span{-webkit-text-stroke-color:#2a3048;tex
 html[data-skin=royal] .rl-level{display:inline-block;margin:2px 0 14px;padding:3px 20px;border-radius:12px;background:#1a2470;border:2px solid #ffd35a;font-size:18px;font-weight:1000;color:#fff}
 /* 18.11: карточка ривайва — одна мысль: «Only N left!» и сами фигуры крупно (без полосы, «что даст», подзаголовка и счётчика) */
 html[data-skin=royal] .rl-left{font-size:27px;font-weight:1000;color:#fff;-webkit-text-stroke:5px #10195a;paint-order:stroke fill;line-height:1.15;margin:4px 0 6px}
+html[data-skin=royal] .rl-left.rl-rug{font-size:18px;-webkit-text-stroke:4px #5a1020;color:#ffd9de;margin:2px 0 4px}
 html[data-skin=royal] .rl-left b{color:#ffe14d;font-size:33px}
 html[data-skin=royal] .rl-want{display:flex;align-items:center;justify-content:center;gap:4px;margin:0 0 12px}
 html[data-skin=royal] .rl-want canvas{width:66px;height:66px;filter:drop-shadow(0 0 9px rgba(255,226,120,.5))}
@@ -299,6 +302,16 @@ const CFG = {
   CALM_FROM: 3,        // с какого уровня (номер игры) раздача старается не вставать туда, где половинка сразу, без хода игрока, собирает фигуру с соседом
                        // (no_instant_dock_from_level; 0 — выключено). 18.11 v3, Андрей: «после 2–3 уровня вообще стараться не спаунить половинку, после появления
                        // которой сразу соберётся фигура». «Старается»: некуда — можно; игрок сам подвёл пару к призраку — это его ход, стыкуется.
+  // --- ЛД-механики и линейки уровней (19.11; DESIGN «ЛД-механики: ковёр, ворота, сундук; 500 уровней») ---
+  LEVEL_PLAN: 'main',    // линейка уровней: 'v3' — таблица 19.11 (100 уровней, ссылки polovinki / royal / goals …), 'dev' — 500 уровней для щупанья ЛД (с 10-го —
+                       // новые механики подряд, потом комбинации и микс), 'release' — предложенный порядок ввода для релиза (docs/ld-order-20261119.md),
+                       // 'main' — 19.11 вечер (Андрей: «линейку уровней до 500 без этих новых ЛД-механик, но начиная с 20 разные варианты поля иногда подкидывать»):
+                       // 1–100 — таблица v3 на своих местах, с 20-го примерно каждый третий–пятый уровень на фигурном поле; 101–500 — микс знакомых механик.
+                       // Сборки goals и lab — 'main'. Удалённый ключ level_plan. Переключение — только здесь или ключом: таблицы не правятся (setLevelPlan).
+  RUG_GOAL: 0.85,      // ковёр: какую долю клеток поля застелить (по умолчанию; у уровня — rugGoal: доля ≤ 1 или число клеток)
+  CHEST_IDLE: 3,       // сундук: столько ходов подряд без стыковки — выдаёт половинку сам (страховка: уровень не встаёт)
+  CHEST_HELP: 0.7,     // сундук: доля выдач «пара к одинокой половинке нужного цвета» (иначе — половинка нужного цвета)
+  CHEST_SKIP: 0.5,     // пока в сундуке есть половинки, обычная раздача пропускается с этой вероятностью (новое приходит в основном из сундука)
   HELP_SCALE: 1,       // множитель доли раздач «пара к одинокой» help (help_scale, 0…2; итог не больше 1)
   FIGS_SCALE: 1,       // множитель длины уровней — числа фигур в заказах (figs_scale, 0,5…2)
   LOOP_FROM: 39,       // после последнего уровня таблицы — по кругу с этого номера (номера на экране продолжают расти); 18.11 ночь: глава 2 с 39-го (было 49)
@@ -353,6 +366,8 @@ const CFG = {
   INTRO_MS: 260,       // впрыгивание одной плитки на старте уровня (задержка по диагонали INTRO_STEP)
   INTRO_STEP: 38,      // мс задержки на клетку диагонали
   IDLE_HINT_MS: 5000,  // бездействие, после которого подмигивает плитка с готовой стыковкой
+  IDLE_HINT_UNTIL: 9,  // 19.11 вечер (Андрей: «помощь при бездействии давай ограничим 9 левелом (вынесем в ремоут-конфиг)»): по какой уровень включительно (номер в игре)
+                       // показывается подсказка при бездействии — рука (GOALS2) или подмигивание плитки; дальше нет. Ключ idle_hint_until_level, 0 — нет совсем.
   LESSON_HINT_MS: 1400, // на уроке: бездействие, после которого рука показывает следующий ход (до первого хода — сразу)
   DANGER_EMPTY: 4,     // пустых клеток не больше — рамка поля тревожно пульсирует
   DRAG_PULL: 0.16,     // насколько плитка тянется за пальцем (доля клетки)
@@ -443,6 +458,9 @@ const CFG = {
 
 const STONE = -1, CRATE = -2;                              // помехи: камень вечный, ящик ломается стыковкой рядом
 const VOID = -3;                                           // вырез поля (18.11 v3, фигурные поля): клетки нет — плитка упирается, как в стену; раздача сюда не падает
+// ЛД-механики (19.11, Андрей: «давай все три механики»; docs/ld-features-20261119.md, DESIGN «ЛД-механики: ковёр, ворота, сундук; 500 уровней»):
+const GATE = -4;                                           // клетка за воротами: пока ворота закрыты — упор, как вырез; раздача сюда не падает. Открылись — клетка поля (с тем, что за забором стояло)
+const CHEST = -5;                                          // сундук-раздатчик: упор; стыковка вплотную к нему выбивает из него половинку в ближайшую свободную клетку; опустел — клетка свободна
 const HONEY = 1;                                           // пол (массив floor): мёд — плитка на нём останавливается
 const RAINBOW = 5;                                         // «цвет» радужной половинки: стыкуется с любым цветом
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];          // → ← ↓ ↑
@@ -657,6 +675,174 @@ const LAB = [
   { n: 203, ...MID,  stones: 0, w: 6, h: 7, mask: ['__..__', '__..__', '......', '......', '......', '__..__', '__..__'], seed: 7 },   // «крест» 6×7: 26 клеток, два рукава по 2 клетки
 ];
 
+// ===== Линейки уровней dev и release (19.11, Андрей: «к утру 500 уровней с ЛД-механиками и разными препятствиями, дев-билд, который легко переделать под релизный;
+// в дев-билде с 10 уровня ЛД-механики одна за другой и может быть комбинаторика… в релизе они, конечно, будут позже»). DESIGN «ЛД-механики: ковёр, ворота, сундук; 500 уровней».
+// Линейка — правила + сиды, а не 500 строк: buildPlan собирает уровни из ролей (EASY/MID/TOUGH/HARD), механик (PF), форм поля (FIELD_SHAPES) и шаблонов камней;
+// сиды подобраны sim.mjs autopick --plan <имя> по коридорам ролей и лежат в PLAN_SEEDS (номер уровня → сдвиг сида), точечные дотяжки — в PLAN_TUNE.
+// Уровни 1–9 во всех линейках — те же, что в v3 (блок-туториал, урок раздачи, вводные, урок верх/низ, лёгкий верх/низ).
+const LEVELS_V3 = LEVELS.slice();
+const V3 = (n, extra) => ({ ...LEVELS_V3.find(L => L.n === n), v3: true, ...(extra || {}) });
+// Уроки новых механик (ручное поле, без раздачи; рука показывает ход, фокус — затемнение и пятно). Проверка — test.mjs «урок ковра / ворот / сундука».
+const LESSON_RUG = { n: 2001, layout: ['. . =. =. s^', 'h . =H =. .', '. . . =. =S^'], queue: ['h', 's'], show: 1, rugGoal: 13, every: 0, lesson: true, tut: ['rug', 'rugGoal'], lab: 'Carpet: lesson' };
+// Урок ворот (19.11 вечер — заказ на замке): на заборе карточка «сердце»; сердце собирается → летит в замок → забор падает → за ним пара звёзд для заказа на панели.
+const LESSON_GATE = { n: 2002, layout: ['h . . . H', '. . . . .', '. . . . .', '|s |. |. |. |S'], queue: ['s'], gateOrd: ['h'], show: 1, every: 0, lesson: true, tut: ['gate'], lab: 'Gate: lesson' };
+const LESSON_CHEST = { n: 2003, layout: ['. . . . .', 's h . . H', '. . . $S .', '. . . . .'], queue: ['h', 's'], show: 1, every: 0, lesson: true, tut: ['chest'], lab: 'Chest: lesson' };
+// Механики как «добавки» к роли уровня: (роль) → поля spec. Ковёр и ворота дают уровню вторую цель / второй акт — фигур меньше на 1–2.
+const ROLE_K = { easy: 0, mid: 1, tough: 2, hard: 3 };
+const PF = {
+  // wantK — поправка доли нужных раздач на механику (сравнение audit/ld-compare.mjs, средний на mid при базе 92 %: верх/низ 59, ящики 63, ворота 70, таймер 75, цепи 76, мёд 80)
+  vert:    (r) => ({ vert: [0.4, 0.45, 0.45, 0.45][ROLE_K[r]], wantK: 0.15 }),
+  honey:   (r) => ({ honey: [2, 3, 3, 3][ROLE_K[r]], wantK: 0.05 }),
+  rainbow: (r) => ({ rainbow: [0.15, 0.12, 0.15, 0.12][ROLE_K[r]] }),
+  crates:  (r) => ({ crates: [2, 3, 3, 3][ROLE_K[r]], crateGoal: [2, 3, 3, 3][ROLE_K[r]], figsK: -3, wantK: 0.1 }),
+  chains:  (r) => ({ chains: [1, 2, 2, 2][ROLE_K[r]], wantK: 0.05 }),
+  timer:   (r) => ({ timerP: [0.2, 0.25, 0.25, 0.22][ROLE_K[r]], timer: [8, 8, 7, 8][ROLE_K[r]], wantK: 0.1 }),
+  tray:    (r) => ({ cap: 3 }),
+  show3:   (r) => ({ show: 3 }),
+  rug:     (r) => ({ rug: ['center', 'center', 'corner', 'corner'][ROLE_K[r]], rugGoal: [0.6, 0.65, 0.65, 0.7][ROLE_K[r]], figsK: -1, wantK: 0.1 }),   // подбор 19.11: с давлением (таймер, мёд, цепи) и на тесных формах ковёр с целью 0,65–0,7 — средний 3–48 %
+  gate:    (r) => ({ gate: ['bottom', 'side', 'corner', 'two'][ROLE_K[r]], gateFigs: [2, 3, 3, [2, 3]][ROLE_K[r]], figsK: [-2, -3, -3, -4][ROLE_K[r]], wantK: 0.1 }),   // 19.11 вечер: на замке заказ из gateFigs фигур (было gateNeed — сколько заказов закрыть); его фигуры — в счёт длины уровня
+  chest:   (r) => ({ chest: ['center', 'center', 'top', 'two'][ROLE_K[r]], chestN: [8, 6, 6, 5][ROLE_K[r]] }),
+};
+const PF_NAME = { vert: 'Up/down', honey: 'Honey', rainbow: 'Rainbow', crates: 'Crates', chains: 'Chains', timer: 'Timer', tray: 'Tray 3', show3: '3 orders', rug: 'Carpet', gate: 'Gate', chest: 'Chest' };
+// База ролей линеек dev/release — мягче таблицы v3 по want: так дотягивались уровни главы 2 после раздачи без самосборки (v3: tough 0,4–0,55, hard 0,55–0,72);
+// обзор с базой v3 (tools/plan-scan.mjs, сид 0): средний на mid 71 %, tough 43 %, hard 36 % при коридорах 88–96 / 80–90 / 60–75.
+const ROLE_BASE = { easy: EASY, mid: { ...MID, want: 0.62 }, tough: { ...TOUGH, want: 0.55, figs: 11 }, hard: { ...HARD, want: 0.65, figs: 11 } };
+const STONE_ROT = ['twin', 'diag', 'cols', 'bracket', 'center'];
+// Подбор — tools/plan-pick.mjs (сид → want → −1…−2 фигуры, с проверкой на выборке аудита), вписывает tools/apply-plan-seeds.mjs. mix — общий хвост 151–500 (одинаков в dev и release).
+const PLAN_SEEDS = { main: {20: 0, 24: 0, 28: 0, 31: 0, 35: 3, 42: 7, 45: 4, 51: 6, 57: 4, 60: 5, 64: 3, 65: 4, 66: 11, 67: 6, 68: 9, 72: 9, 75: 5, 78: 5, 81: 2, 84: 0, 85: 7, 86: 11, 87: 1, 88: 3, 92: 6, 95: 0, 98: 2, 100: 9, 101: 0, 102: 1, 103: 0, 104: 5, 105: 11, 106: 4, 107: 5, 108: 4, 109: 1, 110: 4, 111: 1, 112: 6, 113: 7, 114: 0, 115: 9, 116: 1, 117: 2, 118: 1, 119: 0, 120: 3, 121: 1, 122: 0, 123: 2, 124: 0, 125: 11, 126: 6, 127: 6, 128: 7, 129: 3, 130: 9, 131: 4, 132: 11, 133: 8, 134: 0, 135: 11, 136: 6, 137: 2, 138: 7, 139: 11, 140: 9, 141: 7, 142: 6, 143: 5, 144: 1, 145: 5, 146: 8, 147: 1, 148: 4, 149: 0, 150: 10, 151: 0, 152: 1, 153: 4, 154: 1, 155: 11, 156: 8, 157: 2, 158: 5, 159: 8, 160: 7, 161: 7, 162: 7, 163: 10, 164: 7, 165: 10, 166: 1, 167: 1, 168: 10, 169: 0, 170: 9, 171: 1, 172: 0, 173: 4, 174: 0, 175: 2, 176: 0, 177: 7, 178: 2, 179: 11, 180: 3, 181: 0, 182: 0, 183: 5, 184: 0, 185: 6, 186: 10, 187: 6, 188: 7, 189: 9, 190: 2, 191: 6, 192: 5, 193: 10, 194: 1, 195: 5, 196: 9, 197: 5, 198: 7, 199: 9, 200: 2, 201: 4, 202: 1, 203: 3, 204: 3, 205: 9, 206: 2, 207: 0, 208: 0, 209: 4, 210: 7, 211: 2, 212: 1, 213: 5, 214: 0, 215: 1, 216: 8, 217: 1, 218: 7, 219: 4, 220: 2, 221: 7, 222: 0, 223: 7, 224: 0, 225: 2, 226: 2, 227: 1, 228: 3, 229: 7, 230: 5, 231: 1, 232: 2, 233: 0, 234: 2, 235: 0, 236: 9, 237: 9, 238: 8, 239: 9, 240: 0, 241: 1, 242: 2, 243: 9, 244: 0, 245: 10, 246: 0, 247: 0, 248: 7, 249: 3, 250: 10, 251: 0, 252: 0, 253: 0, 254: 0, 255: 0, 256: 6, 257: 2, 258: 1, 259: 1, 260: 9, 261: 6, 262: 3, 263: 0, 264: 0, 265: 1, 266: 0, 267: 0, 268: 0, 269: 0, 270: 9, 271: 0, 272: 0, 273: 5, 274: 0, 275: 8, 276: 4, 277: 2, 278: 2, 279: 6, 280: 4, 281: 0, 282: 4, 283: 10, 284: 0, 285: 9, 286: 2, 287: 0, 288: 7, 289: 3, 290: 4, 291: 0, 292: 1, 293: 11, 294: 1, 295: 6, 296: 3, 297: 8, 298: 3, 299: 4, 300: 11, 301: 7, 302: 1, 303: 4, 304: 8, 305: 3, 306: 1, 307: 7, 308: 1, 309: 0, 310: 6, 311: 0, 312: 1, 313: 1, 314: 0, 315: 5, 316: 0, 317: 0, 318: 7, 319: 2, 320: 7, 321: 0, 322: 0, 323: 6, 324: 0, 325: 10, 326: 6, 327: 10, 328: 1, 329: 0, 330: 9, 331: 1, 332: 7, 333: 0, 334: 0, 335: 7, 336: 5, 337: 7, 338: 3, 339: 8, 340: 11, 341: 0, 342: 0, 343: 5, 344: 0, 345: 0, 346: 0, 347: 0, 348: 2, 349: 0, 350: 1, 351: 0, 352: 1, 353: 9, 354: 0, 355: 5, 356: 1, 357: 7, 358: 4, 359: 0, 360: 7, 361: 5, 362: 10, 363: 9, 364: 5, 365: 9, 366: 0, 367: 1, 368: 9, 369: 0, 370: 1, 371: 0, 372: 8, 373: 6, 374: 0, 375: 0, 376: 3, 377: 1, 378: 1, 379: 7, 380: 3, 381: 0, 382: 1, 383: 8, 384: 0, 385: 9, 386: 10, 387: 10, 388: 4, 389: 8, 390: 4, 391: 6, 392: 10, 393: 3, 394: 0, 395: 4, 396: 7, 397: 3, 398: 6, 399: 11, 400: 11, 401: 6, 402: 1, 403: 4, 404: 9, 405: 1, 406: 5, 407: 4, 408: 0, 409: 1, 410: 2, 411: 3, 412: 2, 413: 1, 414: 0, 415: 10, 416: 0, 417: 1, 418: 9, 419: 0, 420: 4, 421: 1, 422: 0, 423: 7, 424: 0, 425: 9, 426: 4, 427: 8, 428: 3, 429: 2, 430: 1, 431: 0, 432: 6, 433: 5, 434: 0, 435: 3, 436: 0, 437: 3, 438: 1, 439: 9, 440: 9, 441: 0, 442: 6, 443: 1, 444: 1, 445: 10, 446: 2, 447: 2, 448: 9, 449: 0, 450: 6, 451: 1, 452: 0, 453: 3, 454: 2, 455: 11, 456: 1, 457: 3, 458: 6, 459: 0, 460: 9, 461: 0, 462: 4, 463: 11, 464: 7, 465: 1, 466: 4, 467: 1, 468: 0, 469: 0, 470: 5, 471: 3, 472: 2, 473: 9, 474: 0, 475: 11, 476: 10, 477: 0, 478: 3, 479: 10, 480: 5, 481: 0, 482: 5, 483: 9, 484: 0, 485: 0, 486: 1, 487: 6, 488: 1, 489: 5, 490: 8, 491: 2, 492: 6, 493: 11, 494: 1, 495: 8, 496: 6, 497: 7, 498: 8, 499: 10, 500: 3}, dev: {11: 0, 12: 1, 13: 2, 15: 0, 16: 0, 17: 5, 19: 0, 20: 1, 21: 4, 22: 0, 23: 3, 24: 5, 25: 3, 26: 1, 27: 0, 28: 0, 29: 6, 30: 0, 56: 0, 57: 9, 58: 4, 59: 2, 60: 1, 61: 0, 62: 2, 63: 7, 64: 0, 65: 0, 66: 3, 67: 5, 68: 8, 69: 3, 70: 6, 71: 1, 72: 8, 73: 3, 74: 0, 75: 8, 76: 3, 77: 0, 78: 6, 79: 0, 80: 2, 81: 0, 82: 11, 83: 9, 84: 1, 85: 5, 86: 0, 87: 1, 88: 7, 89: 5, 90: 1, 91: 0, 92: 2, 93: 11, 94: 0, 95: 2, 96: 4, 97: 2, 98: 4, 99: 1, 100: 6, 101: 0, 102: 4, 103: 5, 104: 0, 105: 10, 106: 0, 107: 7, 108: 7, 109: 0, 110: 5, 111: 1, 112: 1, 113: 0, 114: 1, 115: 1, 116: 1, 117: 10, 118: 2, 119: 1, 120: 7, 121: 7, 122: 7, 123: 7, 124: 8, 125: 5, 126: 11, 127: 2, 128: 6, 129: 11, 130: 8, 131: 0, 132: 5, 133: 5, 134: 0, 135: 4, 136: 6, 137: 3, 138: 0, 139: 1, 140: 7, 141: 0, 142: 1, 143: 0, 144: 0, 145: 6, 146: 4, 147: 0, 148: 8, 149: 0, 150: 7}, release: {23: 0, 24: 1, 25: 7, 26: 0, 27: 11, 29: 0, 30: 1, 31: 8, 32: 11, 33: 8, 34: 7, 35: 9, 36: 1, 37: 9, 42: 0, 43: 0, 44: 8, 45: 3, 46: 7, 48: 0, 49: 1, 50: 9, 51: 6, 52: 5, 53: 2, 54: 7, 55: 0, 56: 4, 61: 0, 62: 1, 63: 6, 64: 0, 65: 3, 67: 0, 68: 0, 69: 1, 70: 2, 71: 0, 72: 3, 73: 1, 74: 0, 75: 7, 80: 2, 81: 1, 82: 3, 83: 0, 84: 11, 85: 1, 86: 4, 87: 2, 88: 0, 89: 1, 90: 0, 91: 2, 92: 9, 93: 0, 94: 11, 95: 0, 96: 1, 97: 3, 98: 0, 99: 10, 100: 7, 101: 0, 102: 6, 103: 1, 104: 6, 105: 0, 106: 4, 107: 10, 108: 2, 109: 11, 110: 1, 111: 2, 112: 4, 113: 0, 114: 10, 115: 0, 116: 3, 117: 9, 118: 2, 119: 3, 120: 0, 121: 9, 122: 0, 123: 7, 124: 4, 125: 0, 126: 1, 127: 0, 128: 0, 129: 5, 130: 0, 131: 1, 132: 9, 133: 1, 134: 6, 135: 11, 136: 4, 137: 4, 138: 11, 139: 3, 140: 3, 141: 3, 142: 7, 143: 0, 144: 0, 145: 0, 146: 0, 147: 8, 148: 1, 149: 4, 150: 1}, mix: {151: 0, 152: 1, 153: 5, 154: 1, 155: 9, 156: 5, 157: 4, 158: 11, 159: 0, 160: 4, 161: 2, 162: 5, 163: 0, 164: 0, 165: 6, 166: 7, 167: 2, 168: 5, 169: 2, 170: 11, 171: 2, 172: 5, 173: 4, 174: 0, 175: 3, 176: 0, 177: 6, 178: 4, 179: 1, 180: 6, 181: 1, 182: 5, 183: 2, 184: 5, 185: 7, 186: 2, 187: 4, 188: 7, 189: 3, 190: 5, 191: 0, 192: 1, 193: 5, 194: 1, 195: 9, 196: 2, 197: 4, 198: 0, 199: 3, 200: 8, 201: 3, 202: 4, 203: 10, 204: 5, 205: 8, 206: 0, 207: 0, 208: 7, 209: 0, 210: 1, 211: 0, 212: 2, 213: 0, 214: 0, 215: 6, 216: 7, 217: 11, 218: 1, 219: 4, 220: 11, 221: 0, 222: 2, 223: 1, 224: 1, 225: 5, 226: 4, 227: 5, 228: 4, 229: 1, 230: 7, 231: 0, 232: 4, 233: 3, 234: 0, 235: 8, 236: 5, 237: 2, 238: 0, 239: 2, 240: 3, 241: 0, 242: 6, 243: 6, 244: 3, 245: 2, 246: 0, 247: 2, 248: 0, 249: 0, 250: 9, 251: 0, 252: 0, 253: 7, 254: 1, 255: 8, 256: 1, 257: 6, 258: 10, 259: 0, 260: 2, 261: 1, 262: 1, 263: 7, 264: 0, 265: 7, 266: 1, 267: 0, 268: 5, 269: 5, 270: 2, 271: 1, 272: 1, 273: 6, 274: 1, 275: 3, 276: 0, 277: 0, 278: 9, 279: 4, 280: 2, 281: 1, 282: 5, 283: 5, 284: 0, 285: 6, 286: 3, 287: 0, 288: 1, 289: 0, 290: 3, 291: 0, 292: 0, 293: 6, 294: 0, 295: 5, 296: 6, 297: 7, 298: 3, 299: 7, 300: 5, 301: 0, 302: 3, 303: 11, 304: 6, 305: 3, 306: 0, 307: 2, 308: 5, 309: 0, 310: 5, 311: 0, 312: 0, 313: 1, 314: 0, 315: 8, 316: 0, 317: 8, 318: 11, 319: 1, 320: 5, 321: 2, 322: 0, 323: 2, 324: 1, 325: 2, 326: 0, 327: 4, 328: 6, 329: 0, 330: 0, 331: 0, 332: 2, 333: 5, 334: 0, 335: 3, 336: 2, 337: 4, 338: 7, 339: 2, 340: 0, 341: 0, 342: 2, 343: 5, 344: 3, 345: 0, 346: 0, 347: 5, 348: 3, 349: 2, 350: 6, 351: 0, 352: 1, 353: 2, 354: 0, 355: 11, 356: 1, 357: 11, 358: 5, 359: 3, 360: 10, 361: 0, 362: 2, 363: 1, 364: 0, 365: 0, 366: 2, 367: 0, 368: 5, 369: 2, 370: 8, 371: 0, 372: 4, 373: 7, 374: 3, 375: 0, 376: 2, 377: 3, 378: 5, 379: 4, 380: 0, 381: 0, 382: 3, 383: 5, 384: 0, 385: 4, 386: 2, 387: 3, 388: 1, 389: 1, 390: 4, 391: 0, 392: 5, 393: 7, 394: 1, 395: 7, 396: 5, 397: 7, 398: 7, 399: 0, 400: 7, 401: 1, 402: 1, 403: 0, 404: 0, 405: 2, 406: 1, 407: 4, 408: 1, 409: 1, 410: 8, 411: 0, 412: 1, 413: 0, 414: 1, 415: 10, 416: 8, 417: 7, 418: 7, 419: 7, 420: 10, 421: 1, 422: 2, 423: 5, 424: 0, 425: 3, 426: 1, 427: 0, 428: 6, 429: 1, 430: 0, 431: 0, 432: 0, 433: 3, 434: 0, 435: 5, 436: 0, 437: 5, 438: 2, 439: 5, 440: 6, 441: 0, 442: 3, 443: 3, 444: 1, 445: 3, 446: 0, 447: 2, 448: 0, 449: 0, 450: 10, 451: 1, 452: 4, 453: 7, 454: 0, 455: 1, 456: 4, 457: 9, 458: 6, 459: 2, 460: 8, 461: 0, 462: 0, 463: 4, 464: 0, 465: 0, 466: 2, 467: 2, 468: 2, 469: 2, 470: 4, 471: 0, 472: 0, 473: 2, 474: 0, 475: 0, 476: 2, 477: 11, 478: 0, 479: 5, 480: 1, 481: 2, 482: 7, 483: 0, 484: 2, 485: 11, 486: 6, 487: 1, 488: 5, 489: 2, 490: 2, 491: 0, 492: 5, 493: 7, 494: 1, 495: 9, 496: 7, 497: 0, 498: 1, 499: 4, 500: 0} };   // номер уровня → seed
+const PLAN_TUNE = { main: {35: {figs: 8}, 42: {figs: 8}, 51: {figs: 8}, 57: {figs: 8}, 64: {figs: 6}, 65: {want: 0.66, figs: 8}, 66: {want: 0.55, figs: 10, colors: 3}, 67: {figs: 7}, 68: {figs: 7}, 75: {want: 0.74}, 78: {figs: 11, colors: 4}, 86: {want: 0.3}, 88: {want: 0.32, figs: 12}, 98: {figs: 10}, 101: {figs: 8}, 103: {want: 0.8, figs: 9}, 104: {figs: 7}, 105: {figs: 9}, 108: {want: 0.7, figs: 6}, 110: {figs: 7}, 113: {want: 0.7, colors: 3}, 115: {figs: 10}, 118: {figs: 9}, 121: {want: 0.85}, 123: {want: 0.7, figs: 10}, 124: {want: 0.85}, 125: {want: 0.7, figs: 10}, 127: {want: 0.82}, 128: {figs: 10}, 129: {figs: 8}, 130: {want: 0.85, figs: 7, colors: 4}, 133: {want: 0.75}, 135: {figs: 6}, 137: {figs: 8}, 138: {want: 0.7, figs: 9}, 140: {figs: 10}, 145: {figs: 9}, 153: {want: 0.75}, 158: {want: 0.8}, 165: {figs: 9}, 166: {want: 0.85}, 168: {want: 0.7}, 169: {want: 0.85}, 170: {want: 0.8}, 171: {want: 0.85}, 173: {want: 0.6}, 174: {want: 0.85}, 175: {want: 0.7}, 180: {figs: 6, colors: 4}, 183: {want: 0.75}, 185: {want: 0.45}, 187: {want: 0.82}, 190: {want: 0.85, figs: 8, colors: 4}, 200: {figs: 9, colors: 4}, 203: {want: 0.7}, 208: {want: 0.7}, 213: {want: 0.8}, 218: {want: 0.75}, 220: {figs: 10, colors: 4}, 221: {want: 0.85}, 223: {want: 0.6}, 224: {want: 0.85}, 225: {want: 0.8}, 227: {want: 0.82}, 230: {want: 0.85, figs: 8}, 238: {want: 0.7}, 240: {colors: 4}, 243: {want: 0.75}, 245: {figs: 10}, 248: {want: 0.75}, 250: {colors: 4}, 258: {want: 0.8}, 265: {colors: 4}, 266: {want: 0.85}, 268: {want: 0.6}, 269: {want: 0.85}, 270: {want: 0.8}, 271: {want: 0.85}, 273: {want: 0.6}, 274: {want: 0.85}, 275: {want: 0.8}, 280: {figs: 5}, 285: {want: 0.75}, 287: {want: 0.82}, 290: {want: 0.85}, 300: {figs: 8}, 303: {want: 0.7}, 308: {want: 0.7}, 313: {want: 0.7}, 315: {figs: 8}, 321: {want: 0.85}, 323: {want: 0.8}, 324: {want: 0.85}, 325: {want: 0.7, figs: 9}, 327: {want: 0.82}, 330: {want: 0.85, colors: 4}, 338: {want: 0.7}, 340: {figs: 9}, 343: {want: 0.75}, 358: {want: 0.7}, 360: {figs: 7, colors: 4}, 365: {figs: 8, colors: 4}, 366: {want: 0.85}, 368: {want: 0.6}, 369: {want: 0.85}, 370: {want: 0.8}, 371: {want: 0.85}, 373: {want: 0.6}, 374: {want: 0.85}, 375: {want: 0.7}, 383: {want: 0.35}, 387: {want: 0.82}, 390: {want: 0.85, figs: 8, colors: 4}, 392: {want: 0.82}, 395: {figs: 7}, 400: {figs: 8}, 403: {want: 0.7}, 408: {want: 0.8}, 410: {figs: 7}, 413: {want: 0.7}, 421: {want: 0.85}, 423: {want: 0.6}, 424: {want: 0.85}, 425: {want: 0.7}, 427: {want: 0.82}, 430: {want: 0.85, figs: 9}, 435: {figs: 5}, 438: {want: 0.8}, 440: {figs: 11, colors: 4}, 443: {want: 0.75}, 458: {want: 0.8}, 465: {figs: 9}, 466: {want: 0.85}, 468: {want: 0.6}, 469: {want: 0.85}, 470: {want: 0.7}, 471: {want: 0.85}, 473: {want: 0.7}, 474: {want: 0.85}, 475: {want: 0.7}, 480: {colors: 4}, 483: {want: 0.65}, 487: {want: 0.82}, 490: {want: 0.85, figs: 8}, 493: {want: 0.75}, 500: {figs: 9}}, dev: {17: {figs: 6, colors: 4}, 21: {figs: 9}, 26: {figs: 10}, 29: {figs: 10}, 57: {want: 0.82}, 58: {figs: 5}, 59: {figs: 5}, 60: {want: 0.65}, 63: {figs: 7}, 65: {figs: 7}, 66: {figs: 5}, 67: {figs: 5}, 68: {want: 0.75}, 70: {figs: 7}, 72: {figs: 6}, 73: {want: 0.8, figs: 8}, 75: {figs: 8}, 78: {figs: 7}, 80: {figs: 7}, 82: {figs: 6}, 83: {want: 0.7}, 85: {figs: 8, colors: 4}, 87: {want: 0.82}, 90: {want: 0.85, figs: 6, colors: 4}, 95: {figs: 10}, 98: {want: 0.75, figs: 9}, 103: {want: 0.7}, 107: {figs: 7}, 108: {want: 0.75}, 110: {figs: 6}, 111: {want: 0.85}, 113: {want: 0.7, figs: 10}, 114: {want: 0.85}, 115: {want: 0.7, figs: 10}, 117: {want: 0.82}, 120: {want: 0.85}, 121: {figs: 5}, 122: {figs: 5}, 123: {want: 0.85, figs: 5}, 125: {figs: 5}, 126: {figs: 8}, 127: {want: 0.82}, 128: {figs: 9}, 130: {want: 0.85, figs: 9}, 132: {want: 0.82}, 135: {figs: 8, colors: 4}, 138: {figs: 8}, 140: {figs: 6, colors: 4}, 145: {want: 0.75}, 147: {want: 0.82}, 150: {want: 0.85, figs: 8}}, release: {25: {want: 0.75}, 27: {want: 0.75}, 35: {figs: 6, colors: 3}, 37: {figs: 7}, 43: {figs: 7}, 44: {figs: 7}, 46: {figs: 6}, 50: {want: 0.75, figs: 7}, 51: {want: 0.65, figs: 8}, 52: {want: 0.85}, 54: {want: 0.6}, 55: {want: 0.85}, 56: {figs: 7}, 62: {want: 0.82}, 63: {figs: 6}, 65: {want: 0.85, figs: 5, colors: 4}, 69: {want: 0.65}, 70: {figs: 10}, 73: {figs: 9}, 75: {figs: 10}, 82: {want: 0.7}, 84: {figs: 8}, 86: {figs: 6}, 87: {want: 0.7}, 89: {want: 0.7, figs: 5}, 94: {figs: 10}, 97: {figs: 8}, 100: {figs: 6}, 101: {want: 0.82}, 102: {figs: 7}, 103: {figs: 5}, 104: {want: 0.85, figs: 5}, 107: {want: 0.7}, 109: {figs: 7}, 111: {figs: 5}, 112: {figs: 7}, 114: {want: 0.55, figs: 8}, 115: {want: 0.85}, 116: {figs: 8}, 117: {want: 0.4, figs: 12}, 118: {want: 0.85, figs: 8}, 119: {want: 0.7}, 121: {want: 0.82, figs: 6}, 122: {figs: 6}, 123: {figs: 5}, 124: {want: 0.75, figs: 5}, 127: {figs: 7, want: 0.75}, 129: {figs: 5}, 131: {want: 0.82, figs: 7}, 134: {want: 0.85, figs: 8}, 135: {figs: 7}, 136: {want: 0.82, figs: 8}, 137: {figs: 9}, 138: {figs: 10}, 139: {want: 0.85}, 142: {figs: 7}, 144: {figs: 7, colors: 4}, 147: {figs: 8}, 149: {figs: 8, colors: 4}}, mix: {155: {figs: 7}, 158: {want: 0.7}, 160: {figs: 7}, 161: {want: 0.85}, 163: {want: 0.7}, 164: {want: 0.85}, 165: {want: 0.5}, 168: {want: 0.7}, 170: {colors: 4}, 172: {want: 0.82}, 175: {want: 0.85}, 183: {want: 0.8}, 188: {want: 0.7}, 190: {figs: 10, colors: 4}, 195: {colors: 4}, 198: {want: 0.7}, 200: {figs: 8}, 203: {want: 0.45}, 208: {want: 0.7}, 211: {want: 0.85}, 213: {want: 0.6}, 214: {want: 0.85}, 215: {want: 0.7}, 220: {figs: 8}, 223: {want: 0.45}, 225: {want: 0.75}, 228: {want: 0.75}, 232: {want: 0.82}, 235: {want: 0.85}, 241: {want: 0.85}, 243: {want: 0.5}, 244: {want: 0.85}, 245: {want: 0.7}, 248: {want: 0.7}, 250: {figs: 8}, 255: {figs: 7, colors: 4}, 258: {want: 0.8}, 260: {figs: 8}, 261: {want: 0.85}, 263: {want: 0.7}, 264: {want: 0.85}, 268: {want: 0.7}, 270: {figs: 10, colors: 4}, 272: {want: 0.82}, 275: {figs: 8, colors: 4}, 278: {want: 0.75}, 283: {want: 0.7}, 288: {want: 0.7}, 290: {figs: 10}, 293: {want: 0.75}, 295: {colors: 4}, 298: {want: 0.7}, 302: {want: 0.82}, 303: {want: 0.55}, 308: {want: 0.7}, 311: {want: 0.85}, 313: {want: 0.6}, 314: {want: 0.85}, 315: {figs: 10}, 325: {want: 0.75}, 328: {want: 0.75}, 330: {figs: 9}, 332: {want: 0.82}, 335: {figs: 6, want: 0.85}, 338: {want: 0.75}, 341: {want: 0.85}, 343: {want: 0.7}, 344: {want: 0.85}, 345: {want: 0.6}, 348: {want: 0.7}, 355: {colors: 4}, 358: {want: 0.7}, 360: {figs: 8}, 361: {want: 0.85}, 363: {want: 0.6}, 364: {want: 0.85}, 365: {want: 0.7}, 368: {want: 0.7}, 370: {figs: 9, colors: 4}, 372: {want: 0.82}, 375: {colors: 4}, 378: {want: 0.75}, 383: {want: 0.5}, 385: {figs: 7, colors: 4}, 388: {want: 0.7}, 390: {figs: 9}, 398: {want: 0.8}, 403: {want: 0.75}, 408: {want: 0.7}, 410: {figs: 8, colors: 4}, 411: {want: 0.85}, 413: {want: 0.6}, 414: {want: 0.85}, 415: {figs: 10}, 423: {want: 0.65}, 432: {want: 0.82}, 433: {want: 0.65}, 435: {want: 0.85}, 441: {want: 0.85}, 443: {want: 0.6}, 444: {want: 0.85}, 445: {want: 0.6}, 448: {want: 0.7}, 450: {figs: 8}, 453: {want: 0.75}, 455: {figs: 9}, 458: {want: 0.8}, 461: {want: 0.85}, 463: {want: 0.7}, 464: {want: 0.85}, 465: {want: 0.7}, 468: {want: 0.7}, 470: {figs: 8}, 472: {want: 0.82}, 475: {want: 0.85}, 478: {want: 0.75}, 483: {want: 0.7}, 485: {figs: 6}, 488: {want: 0.7}, 495: {figs: 8, colors: 4}, 498: {want: 0.8}} };    // номер уровня → { want, figs } — дотяжка тех, что одним сидом в коридор не встали
+// Уровень из роли, механик и формы. k — номер для чередования шаблонов (камни, зеркала).
+function planLevel(role, feats, shape, k){
+  const R = ROLE_BASE[role], SH = FIELD_SHAPES[shape || 'full'], o = { ...R, w: SH.w, h: SH.h, shape: shape || 'full', feats: feats.slice() };
+  let figsK = 0, wantK = 0;
+  for (const f of feats){ const add = PF[f](role); figsK += add.figsK || 0; wantK += add.wantK || 0; Object.assign(o, add); }
+  delete o.figsK; delete o.wantK; o.figs = Math.max(6, R.figs + figsK); if (wantK) o.want = Math.min(0.9, R.want + wantK);
+  if (feats.indexOf('crates') >= 0 && feats.indexOf('rug') >= 0){ delete o.crates; delete o.crateGoal; o.feats = o.feats.filter(f => f !== 'crates'); }   // две цели на поле — не смешиваем
+  if (o.rug && feats.length > 1){ o.rugGoal -= 0.05; o.figs = Math.max(6, o.figs - 1); }             // ковёр в сочетании — цель и заказы короче
+  if (o.gate && shape === 'rooms') o.gate = 'room';
+  if (o.gate && shape === 'ell') o.gate = o.gate === 'two' ? 'two' : 'bottom';
+  if (o.chest && o.gate) o.chest = o.gate === 'top' ? 'low' : 'top';
+  const holes = SH.mask ? SH.mask.join('').split('_').length - 1 : 0, cells = SH.w * SH.h - holes, inner = shape === 'window' || shape === 'ring' || shape === 'rooms';
+  o.stones = Math.max(0, (role === 'hard' || role === 'tough' ? 2 : 1) - (inner ? 1 : 0) - (cells <= 28 ? 1 : 0) - (o.chest ? 1 : 0));   // форма уже даёт упоры: на тесных полях камней меньше
+  o.stonePat = STONE_ROT[(k || 0) % STONE_ROT.length];
+  if (cells >= 36) o.figs += 2;                                                         // большое поле (две комнаты) — уровень длиннее
+  return o;
+}
+function planLabel(L){
+  if (!L) return '';
+  if (L.lab) return L.lab;
+  if (L.v3lab) return L.v3lab;
+  const f = (L.feats || []).map(x => PF_NAME[x]).join(' + '), sh = L.shape && L.shape !== 'full' ? FIELD_SHAPES[L.shape].name : '';
+  return [f, sh].filter(Boolean).join(' · ') || (L.v3lab || '');
+}
+const SHAPE_CYCLE = ['full', 'corners', 'window', 'hourglass', 'ell', 'tee', 'ring', 'rhomb', 'cross', 'rooms'];
+const SAW = ['easy', 'mid', 'tough', 'easy', 'hard'];                // пила ролей в блоке из 5: «сложный» — каждый пятый
+// ===== Линейка main (19.11 вечер; DESIGN «Линейка main: 500 без новых механик, формы с 20») =====
+// Андрей: «давай сделай линейку уровней до 500 без этих новых ЛД-механик, но давай начиная с 20 разные варианты поля иногда подкидывать».
+// 1–100 — таблица v3 на своих местах (уроки, график механик, главы, подобранные сиды); на уровнях из MAIN_SHAPES — то же содержание (роль, механики, длина)
+// на фигурном поле, сид подобран заново (tools/plan-pick.mjs main). Первые формы простые (углы, окно), сложные (крест, две комнаты) — с 80-х.
+// 101–500 — микс знакомых механик (MAIN_MIX) по пиле ролей; в обычном блоке из 5 один уровень на форме, каждый шестой блок — целиком на одной форме.
+const MAIN_SHAPES = { 20: 'corners', 24: 'window', 28: 'corners', 31: 'window', 35: 'corners', 42: 'hourglass', 45: 'window', 51: 'corners', 57: 'ell', 60: 'tee',
+  64: 'ring', 65: 'ring', 66: 'ring', 67: 'ring', 68: 'ring', 72: 'rhomb', 75: 'hourglass', 78: 'window', 81: 'ell', 84: 'rooms', 85: 'rooms', 86: 'rooms', 87: 'rooms', 88: 'rooms',
+  92: 'cross', 95: 'corners', 98: 'ell', 100: 'cross' };
+const MAIN_MIX = [['vert', 'rainbow'], ['honey', 'crates'], ['chains', 'timer'], ['tray', 'timer'], ['show3', 'chains'], ['vert', 'honey'], ['rainbow', 'crates'], ['tray', 'vert'],
+  ['show3', 'timer'], ['honey', 'chains'], ['rainbow', 'timer'], ['crates', 'chains'], ['vert', 'timer'], ['honey'], ['tray', 'honey'], ['crates', 'vert'], ['show3', 'rainbow'],
+  ['chains', 'vert'], ['tray', 'crates'], ['vert', 'honey', 'chains']];
+const MAIN_TAIL_SHAPES = ['corners', 'window', 'hourglass', 'ell', 'tee', 'ring', 'rhomb', 'cross', 'rooms'];
+const MAIN_TAIL_POS = [3, 1, 4, 2, 0];                                 // какой уровень обычного блока на форме (роли по пиле: лёгкий, средний, сложнее, лёгкий, «сложный»)
+// Механики v3-уровня (ярлык в сетке DEV и форма поля).
+function featsOf(L){ const f = []; if (L.vert) f.push('vert'); if (L.honey) f.push('honey'); if (L.rainbow) f.push('rainbow'); if (L.crates) f.push('crates');
+  if (L.chains) f.push('chains'); if (L.timerP || L.timers) f.push('timer'); if (L.cap === 3) f.push('tray'); if (L.show === 3) f.push('show3'); return f; }
+// v3-уровень на фигурном поле: роль, механики, цвета, длина — те же; камней меньше на тесных формах и с «окнами» (как planLevel); сид — заново.
+function shapedV3(L, shape, k){
+  const SH = FIELD_SHAPES[shape], holes = SH.mask.join('').split('_').length - 1, cells = SH.w * SH.h - holes, inner = shape === 'window' || shape === 'ring' || shape === 'rooms';
+  const o = { ...L, w: SH.w, h: SH.h, shape, feats: featsOf(L), stonePat: STONE_ROT[k % STONE_ROT.length] };
+  o.stones = Math.max(0, (L.stones || 0) - (inner ? 1 : 0) - (cells <= 28 ? 1 : 0));
+  if (cells >= 36) o.figs += 2;
+  delete o.seed; return o;
+}
+const V3_LESSON_LAB = { 7: 'Up/down: lesson', 10: 'Honey: lesson', 14: 'Rainbow: lesson', 18: 'Crates: lesson', 22: 'Chains: lesson', 26: 'Timer: lesson' };   // по индексу
+function buildPlan(name){
+  const out = [], base = name === 'dev' ? 2000 : name === 'main' ? 5000 : 3000;
+  const add = (L) => { const num = out.length + 1, key = name === 'main' ? 'main' : num > 150 ? 'mix' : name, sd = PLAN_SEEDS[key][num], tn = PLAN_TUNE[key][num];   // dev/release: 151–500 — общий микс (те же n и сиды); main — свой
+    const o = L.v3 ? { ...L } : { ...L, n: L.lesson ? L.n + (name === 'dev' ? 0 : 1000) : num > 150 && name !== 'main' ? 4000 + num : base + num };
+    if (sd !== undefined) o.seed = sd; if (tn) Object.assign(o, tn); out.push(o); };
+  const block = (feats, shapes, k0) => SAW.forEach((r, q) => add(planLevel(r, feats, Array.isArray(shapes) ? shapes[q % shapes.length] : shapes, (k0 || 0) + q)));
+  if (name === 'main'){
+    LEVELS_V3.forEach((L, i) => { const num = i + 1, sh = MAIN_SHAPES[num];
+      add(sh ? shapedV3(L, sh, num) : { ...L, v3: true, feats: featsOf(L), v3lab: i < 9 ? ['Tutorial', 'Deal lesson', 'Intro', 'Intro', 'Intro', 'Intro', 'Intro', 'Up/down: lesson', 'Up/down'][i] : V3_LESSON_LAB[i] }); });
+    for (let b = 0; out.length < 500; b++){
+      const f = MAIN_MIX[b % MAIN_MIX.length], whole = b % 6 === 5, sh = MAIN_TAIL_SHAPES[whole ? Math.floor(b / 6) % 9 : (b * 4 + 1) % 9], pos = MAIN_TAIL_POS[b % 5];
+      SAW.forEach((r, q) => { if (out.length < 500) add(planLevel(r, f, whole || q === pos ? sh : 'full', b * 5 + q)); });
+    }
+    return out;
+  }
+  for (let i = 0; i < 9; i++) add({ ...LEVELS_V3[i], v3: true, v3lab: ['Tutorial', 'Deal lesson', 'Intro', 'Intro', 'Intro', 'Intro', 'Intro', 'Up/down: lesson', 'Up/down'][i] });
+  const V3B = (ns, f, tut) => ns.forEach((n, q) => add(V3(n, { feats: [f], v3lab: PF_NAME[f] + (q === 0 && tut ? ': lesson' : ''), ...(q === 0 && tut ? { tut } : {}) })));
+  if (name === 'dev'){
+    // 10–21: три новые механики подряд — урок и три уровня развития (лёгкий, средний на фигурном поле, «сложнее»/«сложный»)
+    add(LESSON_RUG); add(planLevel('easy', ['rug'], 'full', 0)); add(planLevel('mid', ['rug'], 'corners', 1)); add(planLevel('tough', ['rug'], 'window', 2));
+    add(LESSON_GATE); add(planLevel('easy', ['gate'], 'full', 3)); add(planLevel('mid', ['gate'], 'rooms', 4)); add(planLevel('hard', ['gate'], 'full', 5));
+    add(LESSON_CHEST); add(planLevel('easy', ['chest'], 'full', 6)); add(planLevel('mid', ['chest'], 'hourglass', 7)); add(planLevel('hard', ['chest'], 'cross', 8));
+    // 22–30: формы поля — по одной, камни по шаблону, пила ролей
+    ['corners', 'window', 'hourglass', 'cross', 'ell', 'tee', 'ring', 'rhomb', 'rooms'].forEach((sh, q) => add(planLevel(['easy', 'mid', 'tough', 'easy', 'hard', 'easy', 'mid', 'tough', 'easy'][q], [], sh, q)));
+    // 31–55: прежние механики — блоки v3 (урок + развитие), уже подобранные
+    add(V3(13, { feats: ['vert'], v3lab: 'Up/down' }));
+    V3B([16, 17, 18, 20], 'honey', ['honey']); V3B([21, 22, 23, 25], 'rainbow', ['rainbow']); V3B([26, 27, 28, 30], 'crates', ['crates']);
+    V3B([31, 32, 33, 35], 'chains', ['chain']); V3B([36, 37, 38, 40], 'timer', ['timer']); V3B([41, 43, 44, 45], 'tray');
+    // 56–150: комбинации — пары и тройки, новые со старыми, на разных формах (блок из 5 по пиле ролей)
+    const COMBOS = [['rug', 'gate'], ['rug', 'chest'], ['gate', 'chest'], ['rug', 'honey'], ['rug', 'vert'], ['gate', 'chains'], ['gate', 'timer'], ['chest', 'tray'], ['chest', 'timer'],
+      ['rug', 'chains'], ['gate', 'rainbow'], ['chest', 'honey'], ['rug', 'gate', 'chest'], ['gate', 'vert', 'honey'], ['chest', 'chains', 'vert'], ['rug', 'timer'], ['gate', 'tray'], ['chest', 'rainbow'], ['rug', 'gate', 'chest']];
+    COMBOS.forEach((f, b) => block(f, [SHAPE_CYCLE[b % 10], SHAPE_CYCLE[(b + 3) % 10], SHAPE_CYCLE[b % 10], SHAPE_CYCLE[(b + 6) % 10], SHAPE_CYCLE[(b + 1) % 10]], b * 5));
+  } else {
+    // release: предложенный порядок (docs/ld-order-20261119.md). Ранний темп — как одобрено 18.11 (верх/низ 8, мёд 11, радужная 15, ящики 19), дальше новинка раз в 8–10 уровней.
+    add(V3(13, { feats: ['vert'], v3lab: 'Up/down' }));                                                                   // 10
+    V3B([16, 17, 18, 20], 'honey', ['honey']); V3B([21, 22, 23, 25], 'rainbow', ['rainbow']); V3B([26, 27, 28, 30], 'crates', ['crates']);   // 11–22
+    block([], ['corners', 'window', 'hourglass', 'corners', 'cross'], 0);                                              // 23–27: первые формы поля — без новых правил
+    add(LESSON_RUG); ['easy', 'mid', 'tough', 'hard'].forEach((r, q) => add(planLevel(r, ['rug'], ['full', 'corners', 'full', 'window'][q], q)));   // 28–32: ковёр
+    block(['honey', 'crates'], ['full', 'hourglass', 'full', 'corners', 'ell'], 5);                                   // 33–37: смесь знакомого
+    V3B([31, 32, 33, 35], 'chains', ['chain']);                                                                         // 38–41: цепи
+    block(['rug', 'vert'], ['full', 'tee', 'corners', 'full', 'rhomb'], 10);                                          // 42–46
+    add(LESSON_GATE); ['easy', 'mid', 'tough', 'hard'].forEach((r, q) => add(planLevel(r, ['gate'], ['full', 'rooms', 'full', 'full'][q], q)));   // 47–51: ворота
+    block(['rainbow', 'chains'], ['window', 'full', 'ring', 'full', 'cross'], 15);                                    // 52–56
+    V3B([36, 37, 38, 40], 'timer', ['timer']);                                                                          // 57–60: таймер
+    block(['rug', 'gate'], ['full', 'ell', 'rooms', 'corners', 'full'], 20);                                          // 61–65
+    add(LESSON_CHEST); ['easy', 'mid', 'tough', 'hard'].forEach((r, q) => add(planLevel(r, ['chest'], ['full', 'hourglass', 'full', 'cross'][q], q)));   // 66–70: сундук
+    block(['chest', 'timer'], ['full', 'corners', 'tee', 'full', 'window'], 25);                                      // 71–75
+    V3B([41, 43, 44, 45], 'tray');                                                                                      // 76–79: тесный лоток
+    const R2 = [['rug', 'honey'], ['gate', 'chains'], ['chest', 'tray'], ['rug', 'chest'], ['gate', 'timer'], ['rug', 'chains'], ['gate', 'chest'], ['chest', 'honey'],
+      ['rug', 'gate', 'chest'], ['gate', 'rainbow'], ['rug', 'timer'], ['chest', 'vert', 'chains'], ['gate', 'tray'], ['rug', 'rainbow']];
+    R2.forEach((f, b) => block(f, [SHAPE_CYCLE[(b + 2) % 10], SHAPE_CYCLE[(b + 5) % 10], SHAPE_CYCLE[(b + 2) % 10], SHAPE_CYCLE[(b + 8) % 10], SHAPE_CYCLE[(b + 3) % 10]], 30 + b * 5));   // 80–149
+    add(planLevel('easy', ['rug', 'vert'], 'full', 0));                                                                // 150
+  }
+  // дальше до 500 — микс: блок из 5 = одна форма поля (меняется каждый блок) + 1–2 механики (по кругу, старые и новые), «сложный» — каждый пятый
+  const MIX = [['rug'], ['gate', 'honey'], ['chest', 'chains'], ['vert', 'rainbow'], ['rug', 'timer'], ['gate'], ['honey', 'crates'], ['chest', 'vert'], ['rug', 'tray'], ['chains', 'timer'],
+    ['gate', 'chest'], ['rug', 'honey'], ['show3', 'chains'], ['gate', 'vert'], ['chest'], ['tray', 'timer'], ['rug', 'gate'], ['rainbow', 'crates'], ['chest', 'honey'], ['rug', 'chains']];
+  for (let b = 0; out.length < 500; b++){
+    const sh = SHAPE_CYCLE[(b * 3 + 1) % 10], f = MIX[b % MIX.length];
+    SAW.forEach((r, q) => { if (out.length < 500) add(planLevel(r, f, q === 4 ? SHAPE_CYCLE[(b * 3 + 5) % 10] : sh, b * 5 + q)); });
+  }
+  return out;
+}
+const PLANS = { v3: { loop: 39 }, dev: { loop: 151 }, release: { loop: 151 }, main: { loop: 101 } };
+// Главы для сетки уровней в DEV-меню (по индексу уровня).
+const PLAN_CH = {
+  main: { 0: 'Basics', 7: 'A · up & down', 10: 'B · honey', 14: 'C · rainbow', 18: 'D · crates (field shapes from 20)', 22: 'E · chains', 26: 'F · timer', 30: 'G · tight tray', 34: 'Exam',
+    38: 'H · up & down + rainbow', 43: 'I · honey + crates', 48: 'J · chains + timer', 53: 'K · tight tray + timer', 58: 'L · 3 orders + chains',
+    63: 'M · up & down + honey (Ring)', 68: 'N · rainbow + crates', 73: 'O · tight tray + up & down', 78: 'P · 3 orders + timer', 83: 'Q · honey + chains (Two rooms)',
+    88: 'R · rainbow + timer', 93: 'Finale', 100: 'Mix: known mechanics × field shapes, to 500' },
+  dev: { 0: 'Basics (1–9, as before)', 9: 'New · carpet', 13: 'New · gate', 17: 'New · chest', 21: 'Field shapes', 30: 'Known mechanics (v3 blocks)', 55: 'Combos: new × new, new × old', 150: 'Mix: shapes × mechanics, to 500' },
+  release: { 0: 'Basics', 9: 'A · up & down', 10: 'B · honey', 14: 'C · rainbow', 18: 'D · crates', 22: 'Field shapes', 27: 'E · carpet', 32: 'Mix · honey + crates', 37: 'F · chains',
+    41: 'Mix · carpet + up/down', 46: 'G · gate', 51: 'Mix · rainbow + chains', 56: 'H · timer', 60: 'Mix · carpet + gate', 65: 'I · chest', 70: 'Mix · chest + timer', 75: 'J · tight tray',
+    79: 'Chapter 2 · combos', 150: 'Mix: shapes × mechanics, to 500' } };
+// Переключить линейку (CFG.LEVEL_PLAN или удалённый ключ level_plan): содержимое LEVELS заменяется на месте, ссылки на массив не меняются.
+function setLevelPlan(name){
+  if (!PLANS[name]) return false;
+  const list = name === 'v3' ? LEVELS_V3 : buildPlan(name);
+  LEVELS.length = 0; for (const L of list) LEVELS.push(L);
+  CFG.LEVEL_PLAN = name; CFG.LOOP_FROM = PLANS[name].loop;
+  return true;
+}
 // После таблицы — по кругу с LOOP_FROM: уровень 101 повторяет LOOP_FROM, 102 — следующий и т. д. Поле и заказы те же
 // (сид от номера уровня таблицы), номер на экране — li + 1.
 function levelSpec(li){
@@ -668,30 +854,41 @@ function levelSpec(li){
 
 // --- раскладка уровня ---
 const LAYOUT_CHARS = 'hcsdlr';                            // r — радужная (цвет RAINBOW = 5)
+// ЛД (19.11): префикс '=' — ковёр под клеткой; '|' — клетка за воротами (дальше — что за забором: '.', половинка, 'x', '#');
+// '$' + буквы половинок — сундук с этим содержимым по порядку ('$S' — одна правая звезда; '$' без букв — содержимое выбирает игра).
+function pieceToken(t){
+  const col = LAYOUT_CHARS.indexOf(t[0].toLowerCase());
+  if (col < 0) throw new Error('layout: неизвестный токен ' + t);
+  const first = t[0] === t[0].toLowerCase(), vert = t.indexOf('^') >= 0, chain = t.indexOf('*') >= 0;
+  const tm = t.match(/\d+/);
+  return pieceCode(col, (vert ? 2 : 0) + (first ? 0 : 1), chain, tm ? +tm[0] : 0);
+}
 function parseLayout(rows){
   const toks = rows.map(r => r.indexOf(' ') >= 0 ? r.trim().split(/\s+/) : r.split(''));
   const h = toks.length, w = toks[0].length, grid = new Array(w * h).fill(0), floor = new Array(w * h).fill(0);
+  let rug = null; const gate = [], chests = [];
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
     let t = toks[y][x]; const i = y * w + x;
     if (t[0] === '~'){ floor[i] = HONEY; t = t.slice(1); if (!t) continue; }
+    if (t[0] === '='){ (rug = rug || new Array(w * h).fill(0))[i] = 1; t = t.slice(1) || '.'; }
+    if (t[0] === '|'){ const u = t.slice(1) || '.'; gate.push({ cell: i, under: u === '.' ? 0 : u === '#' ? STONE : u === 'x' ? CRATE : pieceToken(u) }); grid[i] = GATE; continue; }
+    if (t[0] === '$'){ grid[i] = CHEST; chests.push({ cell: i, list: t.length > 1 ? t.slice(1).split('').map(pieceToken) : null }); continue; }
     if (t === '.') continue;
     if (t === '#'){ grid[i] = STONE; continue; }
     if (t === 'x'){ grid[i] = CRATE; continue; }
     if (t === '_'){ grid[i] = VOID; continue; }
-    const col = LAYOUT_CHARS.indexOf(t[0].toLowerCase());
-    if (col < 0) throw new Error('layout: неизвестный токен ' + t);
-    const first = t[0] === t[0].toLowerCase(), vert = t.indexOf('^') >= 0, chain = t.indexOf('*') >= 0;
-    const tm = t.match(/\d+/);
-    grid[i] = pieceCode(col, (vert ? 2 : 0) + (first ? 0 : 1), chain, tm ? +tm[0] : 0);
+    grid[i] = pieceToken(t);
   }
-  return { grid, w, h, floor };
+  return { grid, w, h, floor, rug, gates: gate.length ? [{ cells: gate.map(q => q.cell), under: gate.map(q => q.under) }] : null, chests: chests.length ? chests : null };
 }
 function cellToken(s, i){
-  const c = s.grid[i], hon = s.floor && s.floor[i] === HONEY ? '~' : '';
+  const c = s.grid[i], hon = (s.floor && s.floor[i] === HONEY ? '~' : '') + (s.rug && s.rug[i] ? '=' : '');
   if (c === 0) return hon || '.';
   if (c === STONE) return hon + '#';
   if (c === CRATE) return hon + 'x';
   if (c === VOID) return '_';
+  if (c === GATE) return '|';
+  if (c === CHEST) return hon + '$';
   const ch = LAYOUT_CHARS[colorOf(c)], sd = sideOf(c);
   return hon + (sd === 0 || sd === 2 ? ch : ch.toUpperCase()) + (sd >= 2 ? '^' : '') + (isChained(c) ? '*' : '') + (timerOf(c) || '');
 }
@@ -748,6 +945,8 @@ function newOrder(s){ const c = s.queue[s.oi]; return { id: s.oi++, c, f: c.map(
 // Фигура уходит в тот открытый заказ, которому она нужна и который ближе всего к завершению (меньше всего пустых мест);
 // при равенстве — в старший в очереди (меньший id). Решение Андрея 17.11: «дособирать почти готовый заказ, чем начинать новый».
 // Одно правило для стыковки, отдачи из лотка (settle), магнита и «Продолжить» — все идут через place.
+// Заказ ворот (19.11 вечер, Андрей: «на воротах может быть размещать прям заказ, который надо собрать, чтобы они открылись?») — в приоритете:
+// фигура, нужная замку, летит в замок первой (связь «собрал → ворота открылись» видна сразу). Среди заказов ворот — тоже ближайший к завершению.
 function place(s, col){
   let best = null;
   for (let a = 0; a < s.active.length; a++){
@@ -755,7 +954,8 @@ function place(s, col){
     let k = -1, left = 0;
     for (let i = 0; i < o.c.length; i++) if (!o.f[i]){ left++; if (k < 0 && (o.c[i] === col || col === RAINBOW)) k = i; }
     if (k < 0) continue;
-    if (!best || left < best.left || (left === best.left && o.id < best.o.id)) best = { a, k, o, left };
+    const pri = o.gate !== undefined ? 0 : 1;
+    if (!best || pri < best.pri || (pri === best.pri && (left < best.left || (left === best.left && o.id < best.o.id)))) best = { a, k, o, left, pri };
   }
   if (!best) return null;
   best.o.f[best.k] = true; s.served++;
@@ -770,7 +970,8 @@ function settle(s, ev, by){
     let changed = false;
     for (let a = 0; a < s.active.length; a++){
       const o = s.active[a]; if (!o || !o.f.every(Boolean)) continue;
-      ev.push({ type: 'done', slot: a, id: o.id, by });
+      if (o.gate !== undefined){ ev.push({ type: 'done', slot: a, id: o.id, gate: o.gate, by }); s.gates[o.gate].done = true; s.active[a] = null; changed = true; continue; }   // заказ ворот: место не занимает очередь
+      ev.push({ type: 'done', slot: a, id: o.id, by }); s.doneOrders = (s.doneOrders || 0) + 1;
       s.active[a] = s.oi < s.queue.length ? newOrder(s) : null;
       if (s.active[a]) ev.push({ type: 'order', slot: a, id: s.active[a].id, by });
       changed = true;
@@ -782,6 +983,7 @@ function settle(s, ev, by){
     }
     if (!changed) break;
   }
+  if (s.gates) openGates(s, ev, by);
 }
 // Куда идёт целая фигура: в заказ, в лоток, мимо (заказов не осталось) или «не поместилась» (лоток полон — проигрыш).
 function deliver(s, col, ev, by){
@@ -796,14 +998,67 @@ function deliver(s, col, ev, by){
 // ev — события для оболочки; by — кто стыковал ('move' | 'spawn' | 'boost'). Возвращает { color, target }.
 function dock(s, a, b, ev, by){
   const ca = colorOf(s.grid[a]), cb = colorOf(s.grid[b]), col = ca === RAINBOW ? cb : ca;
+  const onRug = !!(s.rug && (s.rug[a] || s.rug[b] || neighbors4(a, s.w, s.h).some(k => s.rug[k]) || neighbors4(b, s.w, s.h).some(k => s.rug[k]))), hit = [];
   s.grid[a] = 0; s.grid[b] = 0; s.docks++;
   for (const c of [a, b]) for (const k of neighbors4(c, s.w, s.h)){
     const v = s.grid[k];
     if (v === CRATE){ s.grid[k] = 0; s.crates++; ev.push({ type: 'crate', cell: k, by }); }
     else if (isChained(v)){ s.grid[k] = v - 100; ev.push({ type: 'chain', cell: k, code: v, by }); }
+    else if (v === CHEST && hit.indexOf(k) < 0) hit.push(k);
   }
+  if (onRug) spreadRug(s, a, b, ev, by);
+  for (const k of hit) chestPop(s, s.chests.find(q => q.cell === k), ev, by);
   const target = deliver(s, col, ev, by);
   return { color: target.kind === 'order' ? target.color : col, target };
+}
+// --- ЛД-механики (19.11): ковёр, ворота, сундук-раздатчик ---
+// Ковёр (цель-покрытие): стыковка на ковре или вплотную к его краю раскатывает его под обе клетки пары и под их соседей
+// (крестом вокруг пары; кроме вырезов, камней и клеток за закрытыми воротами). Цель уровня — застелить rugGoal клеток (карточка-цель, как у ящиков).
+// Правило «только под пару» из предложения (docs/ld-features) оказалось слишком медленным: у края ковра пара даёт 1 новую клетку, уровень растягивается на 20+ стыковок;
+// «только на ковре» (первая версия 19.11) — ковру нужно ~10 стыковок сверх заказов, средний игрок на тесных формах 3–48 %. «На ковре или у края» — ковёр тянется к игроку.
+function rugOk(s, k){ const v = s.grid[k]; return v !== VOID && v !== STONE && v !== GATE; }
+function spreadRug(s, a, b, ev, by){
+  const cells = [], add = (k) => { if (!s.rug[k] && rugOk(s, k)){ s.rug[k] = 1; s.rugN++; cells.push(k); } };
+  add(a); add(b); for (const c of [a, b]) for (const k of neighbors4(c, s.w, s.h)) add(k);
+  if (cells.length) ev.push({ type: 'rug', cells, from: [a, b], by });
+}
+// Ворота: часть поля за забором; на замке — свой заказ (карточка на заборе). Собран — забор падает, клетки становятся полем
+// (с тем, что за ним стояло). Половинка, открывшаяся вплотную к своей паре, стыкуется сразу (by 'gate').
+// До 19.11 вечера на замке было число «закрой N заказов» — Андрей: «пока было непонятно, что с ними делать даже после обучения». Без заказа (g.ord нет) — по-старому.
+function openGates(s, ev, by){
+  for (const g of s.gates){
+    if (g.open || (g.ord ? !g.done : (s.doneOrders || 0) < g.need)) continue;
+    g.open = true; const pcs = [];
+    g.cells.forEach((c, k) => { s.grid[c] = g.under[k] || 0; if (s.grid[c] > 0) pcs.push(c); });
+    ev.push({ type: 'gate', cells: g.cells.slice(), gate: s.gates.indexOf(g), by });
+    for (const c of pcs){ const v = s.grid[c]; if (v <= 0) continue; const p = dockPartner(s.grid, s.w, s.h, c, v); if (p >= 0) dock(s, c, p, ev, 'gate'); }
+  }
+}
+// Сундук-раздатчик: каждая стыковка вплотную выбивает из него одну половинку (следующая видна заранее — торчит из-под крышки) в ближайшую
+// свободную клетку, где она сама не стыкуется (calm). Опустел — исчез. Содержимое — список из раскладки или (генератор) выбор игры: пара
+// к одинокой нужной половинке, иначе половинка нужного цвета. Страховка — CFG.CHEST_IDLE ходов без стыковки: сундук выдаёт сам.
+function chestNext(s, ch){
+  if (ch.list) return ch.list[ch.pops] || ch.list[ch.list.length - 1];
+  const W = wantedColors(s), wl = s.pal.filter(c => W[c]), cols = wl.length ? wl : s.pal, salt = 900 + ch.cell * 7 + ch.pops * 3;
+  const bal = []; for (let c = 0; c < 6; c++) bal.push([0, 0]);
+  for (const v of s.grid) if (v > 0 && colorOf(v) < 5){ const sd = sideOf(v); bal[colorOf(v)][sd >> 1] += (sd & 1) ? -1 : 1; }
+  const lone = []; for (const c of cols) for (let ax = 0; ax < 2; ax++) if (bal[c][ax]) lone.push(pieceCode(c, ax * 2 + (bal[c][ax] > 0 ? 1 : 0)));
+  if (lone.length && hashRand(s.seed, salt, 1) < CFG.CHEST_HELP) return lone[Math.floor(hashRand(s.seed, salt, 2) * lone.length)];
+  const col = cols[Math.floor(hashRand(s.seed, salt, 3) * cols.length)], ax = s.vert && hashRand(s.seed, salt, 4) < s.vert ? 1 : 0;
+  return pieceCode(col, ax * 2 + (hashRand(s.seed, salt, 5) < 0.5 ? 0 : 1));
+}
+function chestPop(s, ch, ev, by){
+  if (!ch || ch.left <= 0) return null;
+  const code = ch.next, cell = calmNearest(s, ch.cell, code);
+  if (cell < 0) return null;
+  s.grid[cell] = code; ch.left--; ch.pops++;
+  const e = { type: 'chest', cell: ch.cell, to: cell, code, left: ch.left, by };
+  ev.push(e);
+  if (ch.left <= 0){ s.grid[ch.cell] = 0; ch.next = 0; ev.push({ type: 'chestGone', cell: ch.cell, by }); }
+  else ch.next = chestNext(s, ch);
+  const p = dockPartner(s.grid, s.w, s.h, cell, code);
+  if (p >= 0){ e.dock = true; dock(s, cell, p, ev, 'chest'); }
+  return e;
 }
 // Таймеры: после хода каждый тикает; дошёл до нуля — плитка каменеет.
 function tickTimers(s, ev){
@@ -862,7 +1117,7 @@ function planFair(s){
   if (starving.length){ const m = Math.max(...starving.map(o => dry[o.col])); pool = starving.filter(o => dry[o.col] === m); }
   // Конец уровня отдельно не мешается (end_mix_chance — только прежнее правило): мешок и так даёт каждый цвет раз за мешок и не больше RUN_MAX подряд.
   // Проба 18.11 ночью — «после нужного с вероятностью END_GAP_P чужой, в том числе вне мешка» — уронила «сложные» уровни (58-й 27 %, 98-й 21 %).
-  else if (hashRand(s.seed, K, 1) < s.help){ const lp = pool.filter(o => lone(o.col)); if (lp.length){ pool = lp; helped = true; } }
+  else if (hashRand(s.seed, K, 1) < s.help || (s.rugGoal && s.rugN < s.rugGoal && !ordersLeft(s))){ const lp = pool.filter(o => lone(o.col)); if (lp.length){ pool = lp; helped = true; } }   // ковёр (19.11): заказы закрыты, ковёр нет — раздача только парами к одиноким
   const toks = [...new Set(pool.map(o => o.t))], t = toks[Math.floor(hashRand(s.seed, K, 3) * toks.length)];
   const cand = pool.filter(o => o.t === t), md = Math.max(...cand.map(o => dry[o.col])), top = cand.filter(o => dry[o.col] === md);
   const col = top[Math.floor(hashRand(s.seed, K, 8) * top.length)].col;
@@ -1115,7 +1370,18 @@ function palOf(spec){
   if (ok) return p.slice(); const out = []; for (let c = 0; c < n; c++) out.push(c); return out;
 }
 function palOrder(s){ const o = s.pal.slice(); for (let c = 0; c < 5; c++) if (o.indexOf(c) < 0) o.push(c); return o; }   // цвета палитры по порядку, потом остальные (уроки с ручным полем)
-function makeState(li, spec, grid, w, h, seed, floor){
+// Заказ ворот k: spec.gateOrd — ручной (буквы, урок: ['h'] или по воротам [['h'], ['sc']]), spec.gateFigs — сколько фигур (число или по воротам);
+// цвета — из палитры уровня по сиду (порядок мест — по номеру в палитре, как у обычных заказов). Нет ни того, ни другого — ворота по-старому (need).
+const GATE_OID = 900;
+function gateOrder(spec, s, k){
+  const go = spec.gateOrd; if (go){ const q = Array.isArray(go) && Array.isArray(go[0]) ? go[k] : go; return q ? (Array.isArray(q) ? q.join('') : q).split('').map(ch => LAYOUT_CHARS.indexOf(ch)) : null; }
+  const gf = spec.gateFigs, n = Array.isArray(gf) ? gf[k] : gf; if (!n) return null;
+  const o = []; for (let i = 0; i < n; i++) o.push(Math.floor(hashRand(s.seed, 61 + k * 7, i) * s.colors));
+  return o.sort().map(c => s.pal[c]);
+}
+// Цвета заказа по id: обычный — из очереди, заказ ворот — с замка.
+function ordCols(s, id){ return id >= GATE_OID && s.gates && s.gates[id - GATE_OID] ? s.gates[id - GATE_OID].ord : s.queue[id]; }
+function makeState(li, spec, grid, w, h, seed, floor, ext){
   const queue = genOrders(spec, seed);
   const s = { li, n: spec.n, w, h, grid, floor: floor || new Array(w * h).fill(0), seed,
     queue, show: spec.show || CFG.ORDER_SHOW, cap: (spec.cap || CFG.TRAY_CAP) + Math.max(0, CFG.TRAY_PLUS || 0),
@@ -1129,19 +1395,85 @@ function makeState(li, spec, grid, w, h, seed, floor){
     deal: spec.deal || CFG.DEAL, near: !!spec.near, nearP: spec.nearP === undefined ? CFG.ASSIST_PAIR : spec.nearP, gap: 0, due: false, idle: 0,
     catchup: spec.catchup !== undefined ? spec.catchup : spec.near ? 2 : 0, k: 0, moves: 0, docks: 0, crates: 0, dead: false, next: null, last: null };
   for (let a = 0; a < s.show; a++) s.active.push(s.oi < queue.length ? newOrder(s) : null);
+  // ЛД (19.11): ковёр (rug — 1 под застеленной клеткой; rugGoal — сколько клеток застелить), ворота (gates), сундуки (chests). ext — слои из parseLayout / genGrid.
+  const X = ext || {}; s.doneOrders = 0;
+  if (X.rug){ s.rug = X.rug.slice(); s.rugN = 0; let cov = 0; for (let i = 0; i < w * h; i++){ if (s.rug[i] && !rugOk(s, i)) s.rug[i] = 0; s.rugN += s.rug[i]; if (rugOk(s, i)) cov++; }
+    const gl = spec.rugGoal === undefined ? CFG.RUG_GOAL : spec.rugGoal; s.rugGoal = Math.max(s.rugN + 1, Math.min(cov, gl <= 1 ? Math.round(cov * gl) : gl)); }
+  if (X.gates){ const need = spec.gateNeed || 1; s.gates = X.gates.map((g, k) => ({ cells: g.cells.slice(), under: g.under.slice(), need: g.need || (Array.isArray(need) ? need[k] : need), open: false }));
+    s.gates.forEach((g, k) => { const ord = gateOrder(spec, s, k); if (!ord) return;           // заказ на замке: отдельный слот после открытых заказов (id GATE_OID + k)
+      g.ord = ord; g.done = false; g.slot = s.active.length; s.active.push({ id: GATE_OID + k, c: ord, f: ord.map(() => false), gate: k }); s.total += ord.length; }); }
+  if (X.chests){ s.chests = X.chests.map(c => ({ cell: c.cell, left: c.list ? c.list.length : (c.n || spec.chestN || 6), pops: 0, next: 0, list: c.list || null }));
+    for (const ch of s.chests) ch.next = chestNext(s, ch); s.chestSkip = spec.chestSkip === undefined ? CFG.CHEST_SKIP : spec.chestSkip; s.chestIdle = 0; }
   if (s.every > 0) planNext(s);
   return s;
 }
+// --- формы поля и шаблоны (19.11, Андрей: «уровни в том числе разной формы»; docs/ld-features «Поле») ---
+// Маска: '_' — вырез (клетки нет), '.' — клетка. Плитка не мельче 6 клеток в ширину и 7 в высоту (на 360×640 клетка ≥ 44 css px).
+const FIELD_SHAPES = {
+  full:      { w: 5, h: 6, name: 'Full', mask: null },
+  corners:   { w: 5, h: 6, name: 'Corners', mask: ['_..._', '.....', '.....', '.....', '.....', '_..._'] },          // срезанные углы, 26
+  window:    { w: 5, h: 6, name: 'Window', mask: ['.....', '.....', '.._..', '.._..', '.....', '.....'] },          // окно в центре, 28
+  hourglass: { w: 5, h: 6, name: 'Hourglass', mask: ['.....', '.....', '_..._', '_..._', '.....', '.....'] },       // «песочные часы» (талия 3), 26
+  cross:     { w: 6, h: 7, name: 'Cross', mask: ['__..__', '__..__', '......', '......', '......', '__..__', '__..__'] },   // крест, 26
+  ell:       { w: 5, h: 7, name: 'L', mask: ['...__', '...__', '...__', '.....', '.....', '.....', '.....'] },     // Г / L, 29
+  tee:       { w: 5, h: 7, name: 'T', mask: ['.....', '.....', '_..._', '_..._', '_..._', '_..._', '_..._'] },     // T (ножка 3), 25
+  ring:      { w: 6, h: 6, name: 'Ring', mask: ['......', '......', '..__..', '..__..', '......', '......'] },      // кольцо-рамка (окно 2×2), 32
+  rhomb:     { w: 6, h: 7, name: 'Rhombus', mask: ['__..__', '_...._', '......', '......', '......', '_...._', '__..__'] },   // ромб, 30
+  rooms:     { w: 6, h: 7, name: 'Two rooms', mask: ['......', '......', '......', '__..__', '......', '......', '......'] },   // две комнаты с проходом 2, 38
+};
+// Камни по шаблону (симметричные узоры вместо случайных): клетки [x, y], зеркало по сиду; лишние (вырез, занято) пропускаются, недостающие — случайно.
+const STONE_PATS = {
+  twin:    (w, h) => [[1, (h >> 1) - 1], [w - 2, (h >> 1) - 1], [1, h >> 1], [w - 2, h >> 1]],     // пара симметричных у центра
+  diag:    (w, h) => [[1, 1], [w - 2, h - 2], [w - 2, 1], [1, h - 2]],                          // диагональ (потом вторая)
+  cols:    (w, h) => [[1, 2], [w - 2, h - 3], [w - 2, 2], [1, h - 3]],                          // «колонны» через клетку
+  center:  (w, h) => [[w >> 1, (h >> 1) - 1], [(w - 1) >> 1, h >> 1], [w >> 1, (h >> 1) + 1]],   // столбик в центре
+  bracket: (w, h) => [[0, (h >> 1) - 1], [w - 1, h >> 1], [0, h >> 1], [w - 1, (h >> 1) - 1]],   // «скобы» у стен
+};
+// Ковёр — стартовое пятно; ворота — область за забором (клетки, кроме вырезов); сундук — клетка. Тоже [x, y], зеркало по сиду.
+const RUG_PATS = {
+  corner: (w, h) => [[0, h - 1], [1, h - 1], [2, h - 1], [0, h - 2], [1, h - 2], [2, h - 2]],
+  center: (w, h) => [[(w >> 1) - 1, (h >> 1) - 1], [w >> 1, (h >> 1) - 1], [(w >> 1) - 1, h >> 1], [w >> 1, h >> 1], [(w >> 1) - 1, (h >> 1) + 1], [w >> 1, (h >> 1) + 1]],
+  row:    (w, h) => { const o = []; for (let x = 0; x < w; x++) o.push([x, h - 1]); return o; },
+  col:    (w, h) => { const o = []; for (let y = 0; y < h; y++) o.push([w >> 1, y]); return o; },
+  spot:   (w, h) => [[w >> 1, h >> 1], [(w >> 1) - 1, h >> 1], [w >> 1, (h >> 1) - 1], [(w >> 1) - 1, (h >> 1) - 1]],
+};
+const GATE_PATS = {
+  bottom: (w, h) => { const o = []; for (let y = h - 2; y < h; y++) for (let x = 0; x < w; x++) o.push([x, y]); return o; },          // нижние 2 ряда
+  top:    (w, h) => { const o = []; for (let y = 0; y < 2; y++) for (let x = 0; x < w; x++) o.push([x, y]); return o; },
+  side:   (w, h) => { const o = []; for (let y = 0; y < h; y++) for (let x = w - 2; x < w; x++) o.push([x, y]); return o; },          // правые 2 столбца
+  corner: (w, h) => { const o = []; for (let y = 0; y < 3; y++) for (let x = w - 2; x < w; x++) o.push([x, y]); return o; },          // угол 2×3
+  room:   (w, h) => { const o = []; for (let y = (h >> 1) + 1; y < h; y++) for (let x = 0; x < w; x++) o.push([x, y]); return o; },   // нижняя комната («две комнаты»)
+  low:    (w, h) => { const o = []; for (let x = 0; x < w; x++) o.push([x, h - 1]); return o; },                                     // нижний ряд
+  two:    (w, h) => GATE_PATS.corner(w, h).concat(GATE_PATS.low(w, h)),      // два забора: угол (первые ворота) и нижний ряд (вторые) — см. genGrid
+};
+const CHEST_PATS = { center: (w, h) => [[w >> 1, h >> 1]], side: (w, h) => [[0, h >> 1]], top: (w, h) => [[w >> 1, 1]], low: (w, h) => [[w >> 1, h - 2]], two: (w, h) => [[1, 1], [w - 2, h - 2]] };
+function patCells(fn, w, h, seed, salt, mask, fixed){
+  const fx = !fixed && hashRand(seed, salt, 41) < 0.5, fy = !fixed && hashRand(seed, salt, 43) < 0.5, out = [];
+  for (const [x0, y0] of fn(w, h)){ const x = fx ? w - 1 - x0 : x0, y = fy ? h - 1 - y0 : y0; if (x < 0 || y < 0 || x >= w || y >= h) continue;
+    const i = y * w + x; if (mask && mask[y][x] === '_') continue; if (out.indexOf(i) < 0) out.push(i); }
+  return out;
+}
+function shapeMask(spec){ return spec.mask || (spec.shape && FIELD_SHAPES[spec.shape] ? FIELD_SHAPES[spec.shape].mask : null); }
 // Генератор поля. Порядок расхода rnd для полей без новых механик — как в v0.1 (уровни 1–10 не меняются).
+// ЛД-поля (19.11): форма (shape/mask), камни по шаблону (stonePat), сундук (chest — шаблон клетки, chestN — сколько половинок), ковёр (rug — шаблон
+// стартового пятна, rugGoal), ворота (gate — шаблон области, gateNeed — сколько заказов закрыть). Шаблоны rnd не расходуют (зеркало — от сида).
 function genGrid(spec, seed){
-  const w = spec.w, h = spec.h, N = w * h; let grid = null, floor = null;
+  const w = spec.w, h = spec.h, N = w * h, mask = shapeMask(spec); let grid = null, floor = null, ext = {};
   for (let a = 0; a < CFG.GEN_ATTEMPTS; a++){
     const rnd = mulberry32(seed * 131 + a);
-    grid = new Array(N).fill(0); floor = new Array(N).fill(0);
-    if (spec.mask) for (let i = 0; i < N; i++) if (spec.mask[(i - i % w) / w][i % w] === '_') grid[i] = VOID;   // фигурное поле: вырезы
+    grid = new Array(N).fill(0); floor = new Array(N).fill(0); ext = {};
+    if (mask) for (let i = 0; i < N; i++) if (mask[(i - i % w) / w][i % w] === '_') grid[i] = VOID;   // фигурное поле: вырезы
     const free = () => { const f = []; for (let i = 0; i < N; i++) if (!grid[i]) f.push(i); return f; };
     const put = (code) => { const f = free(), i = f[Math.floor(rnd() * f.length)]; grid[i] = code; return i; };
-    for (let k = 0; k < (spec.stones || 0); k++) put(STONE);
+    if (spec.chest){                                                 // сундук — не за воротами: из шаблонов по порядку первый, чьи клетки вне области забора
+      const gset = new Set(); if (spec.gate && GATE_PATS[spec.gate]){ const gp = spec.gate === 'two' ? ['corner', 'low'] : [spec.gate];
+        for (const q of gp) for (const c of patCells(GATE_PATS[q], w, h, seed, 7, mask, spec.gate === 'two' || spec.gate === 'room')) gset.add(c); }
+      let cells = [];
+      for (const nm of [spec.chest, 'center', 'top', 'low', 'side']){ const cc = patCells(CHEST_PATS[nm], w, h, seed, 3, mask); if (cc.length && cc.every(c => !gset.has(c))){ cells = cc; break; } }
+      ext.chests = cells.map(c => { grid[c] = CHEST; return { cell: c, n: spec.chestN || 6, list: null }; }); }
+    let st = spec.stones || 0;
+    if (spec.stonePat && STONE_PATS[spec.stonePat]) for (const c of patCells(STONE_PATS[spec.stonePat], w, h, seed + a, 1, mask)){ if (st <= 0) break; if (!grid[c]){ grid[c] = STONE; st--; } }
+    for (let k = 0; k < st; k++) put(STONE);
     for (let k = 0; k < (spec.crates || 0); k++) put(CRATE);
     for (let k = 0; k < (spec.honey || 0); k++){ const f = free().filter(i => !floor[i]); floor[f[Math.floor(rnd() * f.length)]] = HONEY; }
     const placed = [], pal = palOf(spec);
@@ -1152,13 +1484,23 @@ function genGrid(spec, seed){
     }
     for (let k = 0; k < (spec.chains || 0); k++){ const i = placed[Math.floor(rnd() * placed.length)]; if (!isChained(grid[i])) grid[i] += 100; }
     for (let k = 0; k < (spec.timers || 0); k++){ const i = placed[Math.floor(rnd() * placed.length)]; if (!timerOf(grid[i])) grid[i] += 1000 * (spec.timer || 8); }
-    if (hasDock(grid, w, h)) continue;                               // пара не должна стоять готовой до первого хода
-    const s = makeState(-1, spec, grid.slice(), w, h, seed, floor);
+    if (hasDock(grid, w, h)) continue;                               // пара не должна стоять готовой до первого хода (и после открытия ворот — тоже)
+    if (spec.rug && RUG_PATS[spec.rug]){ ext.rug = new Array(N).fill(0); for (const c of patCells(RUG_PATS[spec.rug], w, h, seed, 5, mask)) ext.rug[c] = 1; }
+    if (spec.gate && GATE_PATS[spec.gate]){                          // ворота: что стояло в области — уходит за забор; «two» — два забора (угол, потом низ)
+      const ok = (c) => grid[c] !== VOID && grid[c] !== CHEST;
+      const parts = spec.gate === 'two' ? [patCells(GATE_PATS.corner, w, h, seed, 7, mask, true).filter(ok), patCells(GATE_PATS.low, w, h, seed, 7, mask, true).filter(ok)]
+        : [patCells(GATE_PATS[spec.gate], w, h, seed, 7, mask, spec.gate === 'room').filter(ok)];
+      ext.gates = parts.map(cells => ({ cells, under: cells.map(c => grid[c]) }));
+      for (const cells of parts) for (const c of cells){ grid[c] = GATE; if (ext.rug) ext.rug[c] = 0; }
+      let live = 0; for (let i = 0; i < N; i++) if (grid[i] > 0) live++;
+      if (live < 4) continue;                                        // за забором не всё: перед воротами есть чем играть
+    }
+    const s = makeState(-1, spec, grid.slice(), w, h, seed, floor, ext);
     if (!legalMoves(s).length) continue;
     if (spec.every > 0 && !greedyPlay(s).win) continue;              // страховка в игре: уровень проходим простым ботом
-    return { grid, floor };
+    return { grid, floor, ...ext };
   }
-  return { grid, floor };
+  return { grid, floor, ...ext, fallback: true };                    // ни одна попытка не прошла проверки — подбор сидов такой сид не берёт (19.11 вечер: dev 59 потерял ворота)
 }
 // Блок (уровень-туториал из фаз): все заказы фазы закрыты — на поле кладётся раскладка следующей фазы, её заказы — в общую очередь.
 // События: { type: 'phase', ph, cells } (вид: плитки впрыгивают), затем { type: 'order' } для открытых заказов. Победа — только после последней фазы.
@@ -1199,11 +1541,12 @@ function createState(li){
   const spec = tuneSpec(levelSpec(li), li + 1), seed = levelSeed(spec);
   if (spec.block){ const P = spec.block[0], L = parseLayout(P.layout), s = makeState(li, { ...spec, ...P, show: spec.show }, L.grid, L.w, L.h, seed, L.floor);   // блок: первая фаза
     s.block = spec.block; s.ph = 0; for (let a = 0; a < s.active.length; a++) if (a >= (P.show || s.show)) s.active[a] = null; s.oi = s.active.filter(Boolean).length; return s; }
-  if (spec.layout){ const L = parseLayout(spec.layout); return makeState(li, spec, L.grid, L.w, L.h, seed, L.floor); }
+  if (spec.layout){ const L = parseLayout(spec.layout); return makeState(li, spec, L.grid, L.w, L.h, seed, L.floor, L); }
   const G0 = genGrid(spec, seed);
-  return makeState(li, spec, G0.grid, spec.w, spec.h, seed, G0.floor);
+  return makeState(li, spec, G0.grid, spec.w, spec.h, seed, G0.floor, G0);
 }
-function cloneState(s){ return { ...s, grid: s.grid.slice(), active: s.active.map(o => o && { id: o.id, c: o.c, f: o.f.slice() }), tray: s.tray.slice(), next: s.next && { ...s.next }, last: null }; }
+function cloneState(s){ return { ...s, grid: s.grid.slice(), active: s.active.map(o => o && (o.gate !== undefined ? { id: o.id, c: o.c, f: o.f.slice(), gate: o.gate } : { id: o.id, c: o.c, f: o.f.slice() })), tray: s.tray.slice(), next: s.next && { ...s.next }, last: null,
+  rug: s.rug && s.rug.slice(), gates: s.gates && s.gates.map(g => ({ ...g })), chests: s.chests && s.chests.map(c => ({ ...c })) }; }
 
 function legalMoves(s){
   const out = [];
@@ -1246,10 +1589,15 @@ function applyMove(s, m){
   if (!isWin(n) && !n.trayOver){
     tickTimers(n, last.ev);
     if (n.every > 0){
-      const due = n.deal === 'miss' ? p < 0 || hashRand(n.seed, n.moves, 12) < CFG.DOCK_DEAL : n.deal === 'second' ? n.moves % (n.every * 2) === 0 : n.moves % n.every === 0;
+      let due = n.deal === 'miss' ? p < 0 || hashRand(n.seed, n.moves, 12) < CFG.DOCK_DEAL : n.deal === 'second' ? n.moves % (n.every * 2) === 0 : n.moves % n.every === 0;
+      if (due && n.chests && n.chests.some(c => c.left > 0) && hashRand(n.seed, n.moves, 33) < n.chestSkip) due = false;   // сундук: новое приходит в основном из него
       if (due) last.spawn = spawn(n, last.ev);
       else if (n.next && n.grid[n.next.cell] !== 0) n.next.cell = calmNearest(n, n.next.cell, n.next.code);  // искру заняли — переезжает (calm — туда, где не стыкуется сама)
     }
+  }
+  if (n.chests && !isWin(n) && !n.trayOver){                         // сундук: CHEST_IDLE ходов без стыковки — выдаёт половинку сам
+    n.chestIdle = p >= 0 ? 0 : (s.chestIdle || 0) + 1;
+    if (n.chestIdle >= CFG.CHEST_IDLE){ const ch = n.chests.find(c => c.left > 0); if (ch && chestPop(n, ch, last.ev, 'chestIdle')) n.chestIdle = 0; }
   }
   last.extra = topUp(n, last.ev);
   // Догонялка (17.11; 18.11 — только когда игрок реально застрял): CATCHUP_AFTER ходов подряд без стыковки и на поле нет ни одной стыковки —
@@ -1268,8 +1616,11 @@ function applyMove(s, m){
   n.last = last;
   return n;
 }
-function goalProgress(s){ return { done: s.served + Math.min(s.crates, s.crateGoal), total: s.total + s.crateGoal }; }
-function isWin(s){ return !ordersLeft(s) && s.crates >= s.crateGoal; }
+function goalProgress(s){ return { done: s.served + Math.min(s.crates, s.crateGoal) + (s.rugGoal ? Math.min(s.rugN, s.rugGoal) : 0), total: s.total + s.crateGoal + (s.rugGoal || 0) }; }
+function isWin(s){ return !ordersLeft(s) && s.crates >= s.crateGoal && (!s.rugGoal || s.rugN >= s.rugGoal); }
+function rugLeft(s){ return s.rugGoal ? Math.max(0, s.rugGoal - s.rugN) : 0; }
+function rugMove(s, m){ if (!s.rug) return false; const pk = peekMove(s, m); if (pk.partner < 0) return false;   // стыковка на ковре или у его края
+  for (const c of [pk.to, pk.partner]){ if (s.rug[c]) return true; for (const k of neighbors4(c, s.w, s.h)) if (s.rug[k]) return true; } return false; }
 function isLose(s){ return !isWin(s) && (s.dead || s.trayOver || legalMoves(s).length === 0); }
 // Почему проигран: 'tray' — фигура не влезла в лоток; 'timer' — окаменела; 'board' — поле забито; 'stuck' — тупик на уровне без раздачи (ходить нечем, а поле не полно).
 function loseWhy(s){ return !isLose(s) ? '' : s.trayOver ? 'tray' : s.dead ? 'timer' : s.grid.indexOf(0) < 0 ? 'board' : 'stuck'; }
@@ -1354,11 +1705,15 @@ function revive(s){
 // Первый найденный выигрыш — самый короткий среди просмотренных; при узком луче это «лучшее найденное», не точный минимум.
 function stateKey(s){
   return s.grid.join(',') + '|' + (s.next ? s.next.code + ':' + s.next.cell : '') + '|' + s.crates + '|' + s.tray.join('') + '|' +
-    s.active.map(o => o ? o.id + ':' + o.f.map(b => b ? 1 : 0).join('') : '-').join('/') + '|' + (s.every ? s.moves % s.every : 0);
+    s.active.map(o => o ? o.id + ':' + o.f.map(b => b ? 1 : 0).join('') : '-').join('/') + '|' + (s.every ? s.moves % s.every : 0) +
+    (s.rug ? '|r' + s.rug.join('') : '') + (s.chests ? '|c' + s.chests.map(c => c.left + ':' + c.next).join(',') : '');
 }
 // Тесно на поле и в лотке — чем ближе к краю, тем дороже следующая плитка (квадрат): так боты и солвер берегут место.
 function crowding(s){ const p = pieceCount(s), t = s.tray.length; return p * p / 6 + t * t * 4 + (t >= s.cap ? 30 : 0); }
-function scoreState(s){ return goalProgress(s).done * 1000 + orderMoves(s).length * 25 - crowding(s) * 2; }
+// Оценка прогресса для ботов и солвера: клетка ковра стоит RUG_W фигуры (иначе бот гонит в лоток ненужные фигуры ради ковра и проигрывает по лотку).
+const RUG_W = 0.35;
+function goalScore(s){ return s.served + Math.min(s.crates, s.crateGoal) + (s.rugGoal ? RUG_W * Math.min(s.rugN, s.rugGoal) : 0); }
+function scoreState(s){ return goalScore(s) * 1000 + orderMoves(s).length * 25 - crowding(s) * 2; }
 function solve(s0, width){
   width = width || CFG.PAR_BEAM;
   if (isWin(s0)) return [];
@@ -1392,11 +1747,11 @@ function solve(s0, width){
 //   midNN — в NN% ходов думает как greedy, в остальных как novice (mid50 — «средний игрок»).
 function greedyPick(s){
   let best = -1, bs = -Infinity;
-  const p0 = goalProgress(s).done;
+  const p0 = goalScore(s);
   for (const m of legalMoves(s)){
     const n = applyMove(s, m);
     if (isWin(n)) return m;
-    const sc = isLose(n) ? -1e9 : (goalProgress(n).done - p0) * 1000 + orderMoves(n).length * 12 - crowding(n);
+    const sc = isLose(n) ? -1e9 : (goalScore(n) - p0) * 1000 + orderMoves(n).length * 12 - crowding(n);
     if (sc > bs){ bs = sc; best = m; }
   }
   return best;
@@ -1411,9 +1766,13 @@ function dockerPick(s, rnd){
 }
 function novicePick(s, rnd){
   const moves = legalMoves(s), kinds = moves.map(m => moveKind(s, m));
-  const om = moves.filter((m, k) => kinds[k] === 'order' || kinds[k] === 'bonus');
+  let om = moves.filter((m, k) => kinds[k] === 'order' || kinds[k] === 'bonus');
+  const rugOn = s.rugGoal && s.rugN < s.rugGoal;                    // ковёр (19.11): цель видна на поле — новичок из готовых стыковок берёт ту, что на ковре
+  if (rugOn && om.length > 1){ const rm = om.filter(m => rugMove(s, m)); if (rm.length) om = rm; }
   if (om.length) return om[Math.floor(rnd() * om.length)];
-  const tm = moves.filter((m, k) => kinds[k] === 'tray'); if (tm.length) return tm[Math.floor(rnd() * tm.length)];
+  let tm = moves.filter((m, k) => kinds[k] === 'tray');
+  if (rugOn && tm.length > 1){ const rm = tm.filter(m => rugMove(s, m)); if (rm.length) tm = rm; }
+  if (tm.length) return tm[Math.floor(rnd() * tm.length)];
   const safe = moves.filter((m, k) => kinds[k] !== 'over'), pool = safe.length ? safe : moves;
   return pool[Math.floor(rnd() * pool.length)];
 }
@@ -1456,6 +1815,7 @@ function applyLevelOverrides(o, onApply){   // в ядре (17.11) — чтоб�
     if (Object.keys(next).length){ LEVELS[li] = { ...LEVELS[li], ov: { ...(LEVELS[li].ov || {}), ...next } }; if (onApply) onApply(li + 1, next); }
   }
 }
+if (CFG.LEVEL_PLAN !== 'v3') setLevelPlan(CFG.LEVEL_PLAN);
 /* КОНЕЦ ЯДРА */
 
 // ---------------------------------------------------------------------------
@@ -1494,6 +1854,7 @@ function readSdkConfig(){
   const int = (v, d, lo, hi) => { const n = Math.round(num(v, d)); return n >= lo && n <= hi ? n : d; };
   const get = (k, d) => sdk.config.get(k, d);
   try {
+    const lp = val(get('level_plan', CFG.LEVEL_PLAN)); if (lp !== CFG.LEVEL_PLAN && PLANS[lp]) setLevelPlan(lp);   // 19.11: линейка уровней (v3 | dev | release | main)
     const skip = val(get('skip_levels', []));
     RC.skip_levels = Array.isArray(skip) ? skip.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= LEVELS.length) : [];
     CFG.LOOP_FROM = int(get('loop_from_level', CFG.LOOP_FROM), CFG.LOOP_FROM, 1, LEVELS.length);       // после 100-го — по кругу с этого номера
@@ -1524,14 +1885,15 @@ function readSdkConfig(){
     // 18.11 v3: раздача без мгновенной сборки — с какого уровня (0 — выключено); интро заказов на старте уровня — по какой уровень (0 — нет)
     CFG.CALM_FROM = int(get('no_instant_dock_from_level', CFG.CALM_FROM), CFG.CALM_FROM, 0, 1000);
     CFG.G2_INTRO_UNTIL = int(get('goals_intro_until_level', CFG.G2_INTRO_UNTIL), CFG.G2_INTRO_UNTIL, 0, 100000);
+    CFG.IDLE_HINT_UNTIL = int(get('idle_hint_until_level', CFG.IDLE_HINT_UNTIL), CFG.IDLE_HINT_UNTIL, 0, 100000);   // 19.11 вечер: подсказка при бездействии — по этот уровень
     const dm = val(get('deal_mode', CFG.DEAL)); if (dm === 'miss' || dm === 'each') CFG.DEAL = dm;     // раздача: после хода без стыковки | каждый ход
     applyLevelOverrides(val(get('level_overrides', {})), (n, next) => log('event', 'remote.level', n + ' ' + JSON.stringify(next)));
-    log('event', 'remote', 'skip=' + RC.skip_levels.join(',') + ' loop=' + CFG.LOOP_FROM + ' inter=' + CFG.INTER_FROM + ' boost=' + CFG.BOOST_START + '/' + RC.boosts_per_ad +
+    log('event', 'remote', 'plan=' + CFG.LEVEL_PLAN + ' levels=' + LEVELS.length + ' skip=' + RC.skip_levels.join(',') + ' loop=' + CFG.LOOP_FROM + ' inter=' + CFG.INTER_FROM + ' boost=' + CFG.BOOST_START + '/' + RC.boosts_per_ad +
       ' cap+' + CFG.TRAY_PLUS + ' revive=' + CFG.REVIVE_PAIRS + 'x' + RC.revives_per_level + (RC.free_revive ? ' free' : '') + ' want+' + CFG.WANT_BONUS + ' deal=' + CFG.DEAL +
       ' assist<=' + CFG.ASSIST_UNTIL + 'x' + CFG.ASSIST_PAIR + ' each<=' + CFG.DEAL_EACH_UNTIL + ' help*' + CFG.HELP_SCALE + ' figs*' + CFG.FIGS_SCALE +
       ' dockdeal=' + CFG.DOCK_DEAL + ' catchup>=' + CFG.CATCHUP_AFTER + ' endmix=' + CFG.END_GAP_P +
       ' fair=' + CFG.FAIR + ' bag*' + CFG.BAG_WANT_K + ' run<=' + CFG.RUN_MAX + ' wait<=' + CFG.WAIT_MAX + ' avoid=' + CFG.AVOID_INLINE +
-      ' calm>=' + CFG.CALM_FROM + ' intro<=' + CFG.G2_INTRO_UNTIL);
+      ' calm>=' + CFG.CALM_FROM + ' intro<=' + CFG.G2_INTRO_UNTIL + ' idlehint<=' + CFG.IDLE_HINT_UNTIL);
   } catch (e) { log('event', 'remote', 'sdk-error'); }
   RC.deal = CFG.DEAL;
 }
@@ -1889,7 +2251,7 @@ function startLevel(li){
   CFG.DEAL = RC.deal;                                               // раздача: умолчание ядра или deal_mode из удалённого конфига
     G.s = createState(li); G.s0 = G.s; G.hist = []; G.par = null;
   if (G.screen === 'settings') setPaused('settings', false);
-  G.ending = 0; G.drag = null; G.winT = 0; G.revived = false; G.revives = 0; G.overColor = null; G.offerKey = ''; G.failKey = ''; G.ordX = {}; G.leaving = []; G.queued = null; G.phaseIn = null; G.winHoldK = 1; G.bestCombo = 0; G.traySweep = null; TUT.q = []; TUT.due = []; if (TUT.cur){ TUT.cur = null; setPaused('tut', false); if (TUT.cv) TUT.cv.style.display = 'none'; } tutQueue(TUT_START[li] || []); G.wantPrev = []; G.wantT = []; G.view = null; snapView(); clearFx(true); G.levelT0 = clock(); G.lastInputT = G.levelT0; G.hintFor = null; g2Reset();
+  G.ending = 0; G.drag = null; G.winT = 0; G.revived = false; G.revives = 0; G.overColor = null; G.offerKey = ''; G.failKey = ''; G.ordX = {}; G.leaving = []; G.queued = null; G.phaseIn = null; G.winHoldK = 1; G.bestCombo = 0; G.traySweep = null; TUT.q = []; TUT.due = []; if (TUT.cur){ TUT.cur = null; setPaused('tut', false); if (TUT.cv) TUT.cv.style.display = 'none'; } tutQueue(tutIds(li)); G.wantPrev = []; G.wantT = []; ldReset(); G.view = null; snapView(); clearFx(true); G.levelT0 = clock(); G.lastInputT = G.levelT0; G.hintFor = null; g2Reset();
   Audio.intro(); log('fx.start', 'intro'); G.fxOpen.push({ name: 'intro', t1: G.levelT0 + CFG.INTRO_MS + CFG.INTRO_STEP * 12 });
   G.cursor = G.s.grid.findIndex(c => c > 0);
   const spec = levelSpec(li);
@@ -2237,7 +2599,7 @@ function addMerge(o){
   const t1 = o.t0 + (j2 ? CFG.J2_DOCK_MS : CFG.DOCK_MS * (magnet ? 0.55 : 1)) / ts, flyEnd = t1 + (g2f ? CFG.G2_FLY_MS : J2 ? CFG.J2_FLY_MS : CFG.FLY_MS) / ts;
   const first = (sideOf(o.code) & 1) === 0;                    // пришла левая/верхняя
   const aCell = first ? o.active : o.partner, bCell = first ? o.partner : o.active, vert = isVert(o.code);
-  const target = o.target.kind === 'order' ? { ...o.target, n: s.queue[o.target.id].length } : o.target;
+  const target = o.target.kind === 'order' ? { ...o.target, n: ordCols(s, o.target.id).length } : o.target;
   const M = { aCell, bCell, aCode: first ? o.code : o.partnerCode, bCode: first ? o.partnerCode : o.code, vert, active: o.active, color: col, magnet,
     tShow: o.tShow, t0: o.t0, t1, flyEnd, target, combo: o.combo || 1, j2, g2f };
   G.merges.push(M);
@@ -2262,7 +2624,7 @@ function addMerge(o){
     burst(toTray ? 5 : 9, sp.x, sp.y, flyEnd, { type: 'star', color: 2, v: 0.12, life: 420, r: 5, g: 0 });
     burst(8, sp.x, sp.y, flyEnd, { type: 'dot', color: col, v: 0.1, life: 360, r: 2.5, g: 0 });
     if (J2){                                         // v2: звон посадки выше с каждым заполненным местом; последняя фишка — без звона, сразу аккорд закрытия (одна награда, а не две)
-      const n = s.queue[target.id] ? s.queue[target.id].length : 1, act = s.active.find(q => q && q.id === target.id), filled = act ? act.f.filter(Boolean).length : n;
+      const n = ordCols(s, target.id) ? ordCols(s, target.id).length : 1, act = s.active.find(q => q && q.id === target.id), filled = act ? act.f.filter(Boolean).length : n;
       if (!toTray && filled < n) Audio.coin((flyEnd - clock()) / 1000, filled - 1);
       Audio.whoosh((t1 - clock()) / 1000, (flyEnd - t1) * 0.8);
       G.landRings.push({ x: sp.x, y: sp.y, r: sp.r, t0: flyEnd, col });
@@ -2282,7 +2644,7 @@ function mergeJoint(M, g){
 // с абсолютным временем; новый ход сначала догоняет вид до ядра (snapView), потом раскладывает свои события.
 function viewFromState(s){
   return { cards: s.active.map(o => o && { id: o.id, c: o.c, f: o.f.slice(), pop: o.c.map(() => 0), born: 0, done: 0 }),
-    tray: s.tray.map(c => ({ color: c, t: 0 })), served: s.served, oi: s.oi, crates: s.crates, landT: 0, crateT: 0 };
+    tray: s.tray.map(c => ({ color: c, t: 0 })), served: s.served, oi: s.oi, crates: s.crates, landT: 0, crateT: 0, doneN: s.doneOrders || 0, rug: s.rugN || 0, rugT: 0 };
 }
 function snapView(){
   const old = G.view; G.vq = []; G.flies = []; G.view = G.s ? viewFromState(G.s) : null;
@@ -2319,7 +2681,9 @@ function scheduleDelivery(T, color, tL, evs){
   for (const e of evs){
     if (e.type === 'done'){
       tc += 90 / ts; const t = tc, r = cardRect(e.slot, g), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-      vAt(t, () => { const c = G.view.cards[e.slot]; if (c && c.id === e.id) c.done = t; });
+      vAt(t, () => { const c = G.view.cards[e.slot]; if (c && c.id === e.id) c.done = t; G.view.doneN = (G.view.doneN || 0) + 1; });
+      if (s.gates && e.gate === undefined && s.gates.some(q => !q.ord)) gateSpark(cx, cy, t);   // ворота без заказа (по-старому): от закрытого заказа к замку летит искра
+      if (e.gate !== undefined){ Audio.clink(delay(t)); log('event', 'gate.order', 'done gate=' + e.gate); }      // заказ на замке собран — щелчок замка (забор падает событием gate)
       burst(12, cx, cy, t, { type: 'star', color: 2, v: 0.16, life: 520, r: 6, g: 0 });
       burst(12, cx, cy, t, { type: 'rect', colors: [3, -2, 2], v: 0.2, vy: -0.1, life: 700, r: 3.5, g: 0.0005 });
       if (G2 && G.g2){ burst(12, cx, cy, t, { type: 'rect', colors: [3, 2, -2, 0], v: 0.26, vy: -0.14, life: 800, r: 3.8, g: 0.0006 }); G.landRings.push({ x: cx, y: cy, r: r.h * 0.62, t0: t, col: 2 }); }   // G2: закрытие заказа — отдельный праздник
@@ -2342,7 +2706,7 @@ function scheduleDelivery(T, color, tL, evs){
       log('event', 'phase', 'ph=' + e.ph + ' cells=' + e.cells.length);
       tc = t + (CFG.INTRO_MS + CFG.INTRO_STEP * 6) / ts;
     } else if (e.type === 'untray'){
-      const t0 = tc, t1 = tc + CFG.UNTRAY_MS / ts, T2 = { kind: 'order', slot: e.slot, k: e.k, id: e.id, n: s.queue[e.id].length };
+      const t0 = tc, t1 = tc + CFG.UNTRAY_MS / ts, T2 = { kind: 'order', slot: e.slot, k: e.k, id: e.id, n: ordCols(s, e.id).length };
       vAt(t0, () => { const i = Math.min(e.from, G.view.tray.length - 1); if (i >= 0) G.view.tray.splice(i, 1); G.flies.push({ color: e.color, from: e.from, T: T2, t0, t1 }); });
       vAt(t1, () => fillSlot(T2, t1)); tutAt('untray', t1, e.slot);   // туториал: лоток отдал фигуру в заказ
       Audio.coin(delay(t1));
@@ -2480,10 +2844,11 @@ function loseRibbon(text, kind){
 // Сколько осталось и какие фигуры (18.11, Андрей: «ревайв-попап очень шумный, слишком много инфы для человека в стрессе»): одна строка
 // «Only N left!» (≤ 3) / «N left» и сами фигуры крупно — до 3, дальше «+N». Полосы, «что даст» и счётчика 1/2 больше нет.
 function loseLeft(s){
-  const p = goalProgress(s), left = p.total - p.done, cols = goalLeftColors(s), shown = cols.slice(0, 3), more = left - shown.length;
+  const p = goalProgress(s), rugL = rugLeft(s), left = p.total - p.done - rugL, cols = goalLeftColors(s), shown = cols.slice(0, 3), more = left - shown.length;   // 19.11: клетки ковра — не фигуры, у них своя строка
   const head = left <= 3 ? `Only <b>${left}</b> left!` : `<b>${left}</b> left`;
   const figs = shown.length ? `<div class="rl-want n${shown.length}">${shown.map(c => `<canvas width="120" height="120" data-c="${c}"></canvas>`).join('')}${more > 0 ? `<b>+${more}</b>` : ''}</div>` : '';
-  return `<div class="rl-left">${head}</div>${figs}`;
+  const rug = rugL > 0 ? `<div class="rl-left rl-rug">+ carpet: <b>${rugL}</b></div>` : '';
+  return `<div class="rl-left">${head}</div>${figs}${rug}`;
 }
 function loseIcons(card){
   card.querySelectorAll('canvas[data-c]').forEach((el) => {
@@ -2549,8 +2914,9 @@ function animateEvents(L, T, t1){
   const g = geo(), cs = g.cell, ts = G.timeScale;
   const firstMerge = G.merges.filter(M => M.tShow === T).reduce((m, M) => Math.min(m, M.t0), Infinity);
   const tp = (firstMerge === Infinity ? t1 : firstMerge) + CFG.DOCK_MS * 0.45 / ts;
+  ldEvents(L, T, t1, tp);                            // ЛД (19.11): ковёр раскатывается, ворота открываются, сундук выплёвывает половинку
   for (const e of L.ev){
-    if (e.cell === undefined) continue;                              // события заказов и лотка раскладывает scheduleDelivery
+    if (e.cell === undefined || e.type === 'chest' || e.type === 'chestGone') continue;   // события заказов и лотка раскладывает scheduleDelivery
     const p = cellXY(e.cell, g), cx = p.x + cs / 2, cy = p.y + cs / 2;
     if (e.type === 'crate'){
       G.ghosts.push({ cell: e.cell, kind: 'crate', until: tp });
@@ -2583,7 +2949,7 @@ function undo(){
   if (!G.s || !G.hist.length) return;
   if (G.screen !== 'game') goto('game');
   clearFx(true); G.ending = 0; G.lastInputT = clock(); G.combo = 0;
-  G.s = G.hist.pop(); snapView();
+  G.s = G.hist.pop(); ldReset(); snapView();
   Audio.undo(); log('input', 'undo', 'level=' + (G.s.li + 1)); hud();
 }
 function finishEnding(){
@@ -3227,7 +3593,7 @@ function plural(n, one, few, many){ const a = n % 10, b = n % 100; return a === 
 function ordersLayout(g, own){
   const s = G.s, V = G.view, ns = [];
   for (let a = 0; a < s.show; a++){ const c = V.cards[a]; ns.push(own && own.slot === a ? own.n : c ? c.c.length : 0); }
-  const nx = s.queue[V.oi], nextW = nx ? nx.length * (ROYAL ? NEXT_R.step : NEXT_STEP) + (ROYAL ? NEXT_R.pad : NEXT_PAD) : 0, crateW = s.crateGoal ? CRATE_CARD_W : 0;
+  const nx = s.queue[V.oi], nextW = nx ? nx.length * (ROYAL ? NEXT_R.step : NEXT_STEP) + (ROYAL ? NEXT_R.pad : NEXT_PAD) : 0, crateW = s.crateGoal || s.rugGoal ? CRATE_CARD_W : 0;   // ковёр (19.11) — та же карточка-цель
   let total = nextW + crateW, cnt = (nextW ? 1 : 0) + (crateW ? 1 : 0);
   for (const n of ns) if (n){ total += n * CHIP_STEP + CARD_PAD; cnt++; }
   total += ORD_GAP * Math.max(0, cnt - 1);
@@ -3245,8 +3611,9 @@ function ordersLayout(g, own){
   if (nextW){ const nh = ROYAL ? NEXT_R.h : NEXT_H; out.next = { x, y: g.py + BAND_PAD + (ORD_H - nh) / 2, w: nextW * f, h: nh }; }
   return out;
 }
-function cardRect(a, g, n){ return ordersLayout(g, n ? { slot: a, n } : null).cards[a] || { x: W / 2, y: g.py + BAND_PAD, w: 0, h: ORD_H }; }
-function orderSlotXY(a, k, n, g){ const L = ordersLayout(g, { slot: a, n }), r = L.cards[a], step = CHIP_STEP * L.f; return { x: r.x + r.w / 2 - step * (n - 1) / 2 + step * k, y: r.y + r.h / 2, r: CHIP_R * L.f }; }
+function cardRect(a, g, n){ const gt = gateOfSlot(a); if (gt) return gateCardRect(gt, g); return ordersLayout(g, n ? { slot: a, n } : null).cards[a] || { x: W / 2, y: g.py + BAND_PAD, w: 0, h: ORD_H }; }
+function orderSlotXY(a, k, n, g){ const gt = gateOfSlot(a); if (gt) return gateChipXY(gateCardRect(gt, g), k);
+  const L = ordersLayout(g, { slot: a, n }), r = L.cards[a], step = CHIP_STEP * L.f; return { x: r.x + r.w / 2 - step * (n - 1) / 2 + step * k, y: r.y + r.h / 2, r: CHIP_R * L.f }; }
 // Лоток — общий запас под рядом заказов, в той же панели цели: утопленная полоса с лунками и счётчиком «занято/всего».
 // Заполненность видна заранее: осталось одно место — лоток и счётчик янтарные, свободная лунка мигает «!»; полон — красный.
 function traySide(){ return false; }   // вариант «карман в краю полки» (v0.7.3) убран: Андрей выбрал паз
@@ -3394,7 +3761,16 @@ function drawOrders(c, g, now, hl, introPass){
       c.restore();
     }
   }
-  if (L.crate){                                                  // ящики — карточка-цель в том же ряду
+  if (L.crate && s.rugGoal && !s.crateGoal){                    // ковёр (19.11): карточка-цель — кусочек ковра и сколько клеток ещё застелить
+    const r = L.crate, left = Math.max(0, s.rugGoal - (V.rug || 0)), ok = left <= 0, pop = Math.max(0, 1 - (now - (V.rugT || 0)) / 300), p = crateChipXY(g);
+    drawCard(c, r.x, r.y, r.w, r.h, ok, 3 + 2.5 * intro);
+    c.fillStyle = P.pSlot; c.beginPath(); c.arc(p.x, p.y, p.r, 0, Math.PI * 2); c.fill();
+    const sz = p.r * 1.35 * (1 + 0.3 * pop); c.save(); c.translate(p.x, p.y); c.rotate(-0.12); c.drawImage(rugSprite(sz), -sz / 2, -sz / 2, sz, sz);
+    c.strokeStyle = '#f2c14e'; c.lineWidth = 2; c.strokeRect(-sz / 2 + 2.5, -sz / 2 + 2.5, sz - 5, sz - 5); c.strokeStyle = '#7d1c30'; c.lineWidth = 1.5; c.strokeRect(-sz / 2, -sz / 2, sz, sz); c.restore();
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '900 ' + Math.round(19 * L.f * (1 + 0.25 * pop)) + 'px Nunito, system-ui, sans-serif'; c.fillStyle = P.pInk;
+    if (ok) drawCheckBadge(c, r.x + r.w - 22 * L.f, p.y, 11 * L.f); else c.fillText(left, r.x + r.w - 25 * L.f, p.y + 1);
+    c.textBaseline = 'alphabetic';
+  } else if (L.crate){                                           // ящики — карточка-цель в том же ряду
     const r = L.crate, ok = V.crates >= s.crateGoal, pop = Math.max(0, 1 - (now - V.crateT) / 300), p = crateChipXY(g);
     drawCard(c, r.x, r.y, r.w, r.h, ok, 3 + 2.5 * intro);
     c.fillStyle = P.pSlot; c.beginPath(); c.arc(p.x, p.y, p.r, 0, Math.PI * 2); c.fill();
@@ -3561,7 +3937,7 @@ function g2BarRect(g){
 }
 function g2Spark(T, t){
   if (!g2On(G.s) || !CFG.G2_FLAG) return;
-  const p = orderSlotXY(T.slot, T.k, T.n || (G.s.queue[T.id] ? G.s.queue[T.id].length : 1), geo());
+  const p = orderSlotXY(T.slot, T.k, T.n || (ordCols(G.s, T.id) ? ordCols(G.s, T.id).length : 1), geo());
   G.g2.sparks.push({ x: p.x, y: p.y, t0: t, t1: t + CFG.G2_SPARK_MS / G.timeScale, hit: false });
 }
 function g2Tick(now, n){
@@ -3758,7 +4134,7 @@ function drawG2Aim(c, g, now, ghost){
   if (!CFG.G2_AIM || !ghost || ghost.partner < 0 || !ghost.target || ghost.target.kind === 'bonus') return;
   const s = G.s, cs = g.cell, a = cellXY(ghost.to, g), b = cellXY(ghost.partner, g), T = ghost.target;
   const x0 = (a.x + b.x) / 2 + cs / 2, y0 = (a.y + b.y) / 2 + cs / 2;
-  const tt = T.kind === 'order' ? { ...T, n: s.queue[T.id] ? s.queue[T.id].length : 1 } : T, sp = targetXY(tt, g);
+  const tt = T.kind === 'order' ? { ...T, n: ordCols(s, T.id) ? ordCols(s, T.id).length : 1 } : T, sp = targetXY(tt, g);
   const col = T.kind === 'over' ? P.danger : T.kind === 'tray' ? P.tray : (P.colors[colorOf(ghost.code)] || '#ffffff');
   const mx = (x0 + sp.x) / 2 + (sp.x >= x0 ? -1 : 1) * Math.min(46, Math.abs(sp.y - y0) * 0.16), my = (y0 + sp.y) / 2, N = 11, ph = (now / 520) % 1;
   c.save();
@@ -3770,14 +4146,229 @@ function drawG2Aim(c, g, now, ghost){
   c.restore();
 }
 
+// ---------- ЛД-механики (19.11): ковёр, ворота, сундук — вид. Ядро меняет состояние сразу; экран показывает событие в свой момент: ----------
+// ковёр раскатывается волной от пары (G.rugT — когда клетка застелится, G.rugDir — откуда), ворота держатся закрытыми до прилёта фигуры в заказ (G.gateT),
+// сундук выдаёт половинки по очереди (G.chestEv — до какого момента на крышке прежнее число и торчит прежняя половинка).
+function ldReset(){ G.rugT = {}; G.rugDir = {}; G.gateT = {}; G.chestEv = {}; G.gateSparks = []; }
+function ldEvents(L, T, t1, tp){
+  if (!G.rugT) ldReset();
+  const g = geo(), cs = g.cell, ts = G.timeScale, s = G.s;
+  const flyEnd = G.merges.filter(M => M.tShow === T).reduce((m, M) => Math.max(m, M.flyEnd), tp);
+  let popK = 0, rugEnd = 0;
+  for (const e of L.ev){
+    if (e.type === 'rug'){                                   // ковёр: клетки застилаются по расстоянию от пары, каждая «раскатывается» со стороны пары
+      const t0 = e.by === 'gate' || e.by === 'chest' ? flyEnd : tp;
+      for (const c of e.cells){
+        let best = null; for (const f of e.from){ const d = Math.abs(c % s.w - f % s.w) + Math.abs(Math.floor(c / s.w) - Math.floor(f / s.w)); if (!best || d < best.d) best = { d, f }; }
+        const t = t0 + best.d * 75 / ts, dx = c % s.w - best.f % s.w, dy = Math.floor(c / s.w) - Math.floor(best.f / s.w);
+        G.rugT[c] = t; G.rugDir[c] = best.d === 0 ? -1 : Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 0 : 1) : (dy > 0 ? 2 : 3);
+        const p = cellXY(c, g); burst(5, p.x + cs / 2, p.y + cs / 2, t + 60 / ts, { type: 'dot', colors: ['#ffd35a', '#fff2b8', '#e8566b'], v: 0.08, life: 420, r: 2.6, g: 0 });
+        rugEnd = Math.max(rugEnd, t + 260 / ts);
+      }
+      Audio.whoosh((t0 - clock()) / 1000, 260); fxOpen('rug', rugEnd, 'cells=' + e.cells.length);
+      const nrug = s.rugN; vAt(rugEnd, () => { G.view.rug = nrug; G.view.rugT = rugEnd; }); tutAt('rugGoal', rugEnd + 150 / ts);
+    } else if (e.type === 'gate'){                           // ворота: открываются, когда фигура долетела в заказ и он закрылся
+      const t = flyEnd + (ROYAL ? R_ORD.leave * 0.4 : 200) / ts, cells = e.cells;
+      G.gateT[e.gate] = t;
+      G.phaseIn = { t0: t + 140 / ts, cells: cells.filter(c => s.grid[c] > 0 || s.grid[c] === STONE || s.grid[c] === CRATE) };   // что стояло за забором — впрыгивает
+      for (const c of cells){ const p = cellXY(c, g); burst(4, p.x + cs / 2, p.y + cs * 0.4, t, { type: 'rect', colors: ['#8a5a2e', '#a8733f', '#ffd35a'], v: 0.16, vy: -0.12, life: 650, r: 4, g: 0.0009 }); }
+      const a = gateAnchor(s.gates[e.gate], g); burst(16, a.x, a.y, t, { type: 'star', color: -2, v: 0.2, life: 560, r: 6, g: 0 });
+      praise('Open!', a.x, a.y - cs * 0.55, t, '#e9a91e', 26); Audio.crack((t - clock()) / 1000); Audio.clink((t - clock()) / 1000 + 0.05); Audio.order((t - clock()) / 1000 + 0.18);
+      nudgeAt(t); fxOpen('gate', t + 600 / ts, 'cells=' + cells.length); log('event', 'gate.open', 'cells=' + cells.length);
+    } else if (e.type === 'chest'){                          // сундук: крышка хлопает, половинка вылетает дугой в свою клетку
+      const t = (e.by === 'chestIdle' ? t1 + 260 / ts : tp) + popK * 160 / ts, t2 = t + 420 / ts; popK++;
+      (G.chestEv[e.cell] = G.chestEv[e.cell] || []).push({ t, left: e.left, code: e.code });
+      G.drops.push({ code: e.code, cell: e.to, t0: t, t1: t2, from: e.cell, planned: e.to });
+      Audio.latch((t - clock()) / 1000); Audio.plop((t2 - clock()) / 1000);
+      const p = cellXY(e.cell, g); burst(8, p.x + cs / 2, p.y + cs * 0.2, t, { type: 'star', color: -2, v: 0.12, life: 420, r: 4, g: 0 });
+      fxOpen('chest', t2, 'cell=' + e.cell + ' to=' + e.to);
+    } else if (e.type === 'chestGone'){
+      const ev = G.chestEv[e.cell] || [], until = ev.length ? ev[ev.length - 1].t + 120 / G.timeScale : tp;
+      G.ghosts.push({ cell: e.cell, kind: 'chest', until });
+      const p = cellXY(e.cell, g); burst(14, p.x + cs / 2, p.y + cs / 2, until, { type: 'rect', colors: ['#8a5a2e', '#ffd35a', '#a8733f'], v: 0.18, vy: -0.1, life: 640, r: 4, g: 0.0008 });
+    }
+  }
+}
+// Искра от закрытого заказа к замку ворот (число на замке убывает, когда она долетает — G.view.doneN растёт в тот же момент).
+function gateSpark(x, y, t){ const s = G.s; if (!s || !s.gates) return; const gt = s.gates.find((q, k) => !q.open || clock() < (G.gateT[k] || 0)); if (!gt) return;
+  const a = gateAnchor(gt, geo()); (G.gateSparks = G.gateSparks || []).push({ x, y, ax: a.x, ay: a.y, t0: t - 260 / G.timeScale, t1: t }); }
+// Клетки, которые сейчас закрыты забором: ядро ещё не открыло ворота или открыло, но экран ещё не показал. → Map клетка → номер ворот.
+function gateFenced(s, now){
+  const m = new Map(); if (!s.gates) return m;
+  s.gates.forEach((gt, k) => { if (!gt.open || now < (G.gateT && G.gateT[k] || 0)) for (const c of gt.cells) m.set(c, k); });
+  return m;
+}
+function gateAnchor(gt, g){                                   // где висит замок: клетка ворот ближе всего к центру их области (с заказом — центр карточки)
+  if (gt.ord){ const R = gateCardRect(gt, g); return { x: R.x + R.w / 2, y: R.y + R.h / 2, cell: gt.cells[0] }; }
+  const s = G.s, xs = gt.cells.map(c => c % s.w), ys = gt.cells.map(c => Math.floor(c / s.w)), mx = (Math.min(...xs) + Math.max(...xs)) / 2, my = (Math.min(...ys) + Math.max(...ys)) / 2;
+  let best = gt.cells[0], bd = Infinity; for (const c of gt.cells){ const d = Math.abs(c % s.w - mx) + Math.abs(Math.floor(c / s.w) - my); if (d < bd){ bd = d; best = c; } }
+  const p = cellXY(best, g); return { x: p.x + g.cell / 2, y: p.y + g.cell / 2, cell: best };
+}
+// Ковёр: бордовая дорожка с золотой каймой по краю застеленной области; клетка раскатывается со стороны пары (клип растёт по направлению).
+const rugTiles = new Map();                          // спрайт по размеру: поле и карточка цели просят разные — один кеш на размер пересоздавал бы его каждый кадр
+function rugSprite(cs){
+  const d = Math.min(window.devicePixelRatio || 1, 2) * scale, key = cs.toFixed(1) + ':' + d.toFixed(2);
+  if (rugTiles.has(key)) return rugTiles.get(key);
+  if (rugTiles.size > 8) rugTiles.clear();
+  const n = Math.max(8, Math.ceil(cs * d)), c = document.createElement('canvas'); c.width = c.height = n;
+  const x = c.getContext('2d'); x.scale(n / cs, n / cs);
+  const gr = x.createLinearGradient(0, 0, cs, cs); gr.addColorStop(0, '#d34a5e'); gr.addColorStop(1, '#ad2f46'); x.fillStyle = gr; x.fillRect(0, 0, cs, cs);
+  x.strokeStyle = 'rgba(255,220,150,0.13)'; x.lineWidth = 1;
+  for (let k = -cs; k <= cs; k += cs / 3){ x.beginPath(); x.moveTo(k, 0); x.lineTo(k + cs, cs); x.moveTo(k + cs, 0); x.lineTo(k, cs); x.stroke(); }
+  x.fillStyle = 'rgba(255,214,120,0.42)'; x.beginPath(); x.moveTo(cs / 2, cs * 0.28); x.lineTo(cs * 0.72, cs / 2); x.lineTo(cs / 2, cs * 0.72); x.lineTo(cs * 0.28, cs / 2); x.closePath(); x.fill();
+  x.fillStyle = '#ad2f46'; x.beginPath(); x.moveTo(cs / 2, cs * 0.4); x.lineTo(cs * 0.6, cs / 2); x.lineTo(cs / 2, cs * 0.6); x.lineTo(cs * 0.4, cs / 2); x.closePath(); x.fill();
+  rugTiles.set(key, c); return c;
+}
+// Устоявшийся ковёр рисуется в статичный слой royal (#base, royalBase — перерисовка только когда ковёр изменился); на игровом холсте — только клетки,
+// которые сейчас раскатываются (+300 мс). Без статичного слоя (classic) — всё на игровом.
+const RUG_SETTLE = 300;
+function rugSettled(s, i, now){ const t = (G.rugT || {})[i] || 0; return s.rug[i] && now >= t + RUG_SETTLE / G.timeScale; }
+function drawRugLayer(c, g, s, now, base){
+  if (!base){ drawRugCells(c, g, s, now, () => true); return; }
+  drawRugCells(c, g, s, now, (i) => !rugSettled(s, i, now));
+}
+function drawRugCells(c, g, s, now, sel){
+  const cs = g.cell, RT = G.rugT || {}, on = (i) => s.rug[i] && now >= (RT[i] || 0);
+  const nb = (i, d) => { const x = i % s.w, y = Math.floor(i / s.w), nx = x + DIRS[d][0], ny = y + DIRS[d][1]; return nx < 0 || ny < 0 || nx >= s.w || ny >= s.h ? -1 : ny * s.w + nx; };
+  const spr = rugSprite(cs), dark = new Path2D(), gold = new Path2D(), flash = [];   // кайма — два пути на всё поле (не по обводке на сторону клетки)
+  for (let i = 0; i < s.grid.length; i++){
+    if (!s.rug[i] || !sel(i)) continue; const t = RT[i] || 0; if (now < t) continue;
+    const p = cellXY(i, g), u = Math.min(1, (now - t) / (260 / G.timeScale)), d = (G.rugDir || {})[i];
+    if (u < 1){ const e = ease(u); c.save(); c.beginPath();       // раскатывается со стороны пары
+      if (d === 0) c.rect(p.x, p.y, cs * e, cs); else if (d === 1) c.rect(p.x + cs * (1 - e), p.y, cs * e, cs);
+      else if (d === 2) c.rect(p.x, p.y, cs, cs * e); else if (d === 3) c.rect(p.x, p.y + cs * (1 - e), cs, cs * e);
+      else c.rect(p.x + cs / 2 * (1 - e), p.y + cs / 2 * (1 - e), cs * e, cs * e);
+      c.clip(); c.drawImage(spr, p.x, p.y, cs, cs); c.restore(); flash.push([p, u]); }
+    else c.drawImage(spr, p.x, p.y, cs, cs);
+    for (let k = 0; k < 4; k++){ const j = nb(i, k); if (j >= 0 && on(j)) continue;   // край застеленной области: тёмная кромка и золотая нить
+      const hor = k >= 2, ins = k === 0 || k === 2 ? -1 : 1, x0 = k === 0 ? p.x + cs : p.x, y0 = k === 2 ? p.y + cs : p.y;
+      if (hor){ dark.moveTo(p.x, y0 + ins * 1.5); dark.lineTo(p.x + cs, y0 + ins * 1.5); gold.moveTo(p.x, y0 + ins * 5); gold.lineTo(p.x + cs, y0 + ins * 5); }
+      else { dark.moveTo(x0 + ins * 1.5, p.y); dark.lineTo(x0 + ins * 1.5, p.y + cs); gold.moveTo(x0 + ins * 5, p.y); gold.lineTo(x0 + ins * 5, p.y + cs); } }
+  }
+  c.lineWidth = 3; c.strokeStyle = '#7d1c30'; c.stroke(dark); c.lineWidth = 1.6; c.strokeStyle = '#f2c14e'; c.stroke(gold);
+  for (const [p, u] of flash){ c.save(); c.globalAlpha = 0.5 * (1 - u); c.fillStyle = '#fff4c8'; c.fillRect(p.x, p.y, cs, cs); c.restore(); }
+}
+// Ворота: доски забора поверх клеток, рамка по контуру области, замок с числом (сколько заказов ещё закрыть). Открылись — доски падают, замок лопается.
+function drawGatesLayer(c, g, s, now, fenced){
+  const cs = g.cell, ts = G.timeScale;
+  s.gates.forEach((gt, k) => {
+    const t = (G.gateT && G.gateT[k]) || 0, closed = !gt.open || now < t, u = closed ? 0 : (now - t) / (520 / ts);
+    if (!closed && u >= 1) return;
+    for (const cell of gt.cells){ const p = cellXY(cell, g);
+      c.save();
+      if (!closed){ const v = Math.max(0, u - (cell % s.w) * 0.04); c.globalAlpha = Math.max(0, 1 - v * 1.3); c.translate(p.x + cs / 2, p.y + cs / 2 + v * v * cs * 0.9); c.rotate((cell % 2 ? 1 : -1) * v * 0.5); c.translate(-p.x - cs / 2, -p.y - cs / 2); }
+      drawFenceCell(c, p.x, p.y, cs); c.restore(); }
+    if (closed){
+      c.save(); c.strokeStyle = '#7a4a22'; c.lineWidth = 3; c.setLineDash([]);
+      for (const cell of gt.cells){ const p = cellXY(cell, g), x = cell % s.w, y = Math.floor(cell / s.w);       // кромка забора: где сосед не за этими воротами
+        const side = (dx, dy) => { const nx = x + dx, ny = y + dy; return nx < 0 || ny < 0 || nx >= s.w || ny >= s.h || gt.cells.indexOf(ny * s.w + nx) < 0; };
+        c.beginPath(); if (side(0, -1)){ c.moveTo(p.x, p.y + 1.5); c.lineTo(p.x + cs, p.y + 1.5); } if (side(0, 1)){ c.moveTo(p.x, p.y + cs - 1.5); c.lineTo(p.x + cs, p.y + cs - 1.5); }
+        if (side(-1, 0)){ c.moveTo(p.x + 1.5, p.y); c.lineTo(p.x + 1.5, p.y + cs); } if (side(1, 0)){ c.moveTo(p.x + cs - 1.5, p.y); c.lineTo(p.x + cs - 1.5, p.y + cs); } c.stroke(); }
+      c.restore();
+      if (gt.ord) drawGateCard(c, g, gt, now, 1, 1);               // 19.11 вечер: на замке — заказ
+      else { const a = gateAnchor(gt, g), left = Math.max(0, gt.need - ((G.view && G.view.doneN) || 0)), pulse = 1 + 0.04 * Math.sin(now / 300);
+        drawLock(c, a.x, a.y, cs * 0.34 * pulse, left); }
+    } else if (u < 0.5){ if (gt.ord) drawGateCard(c, g, gt, now, 1 - u * 2, 1 + u * 0.5);   // собранная карточка лопается вместе с забором
+      else { const a = gateAnchor(gt, g); c.save(); c.globalAlpha = 1 - u * 2; drawLock(c, a.x, a.y - u * cs * 0.8, cs * 0.34 * (1 + u), 0); c.restore(); } }
+  });
+  for (const q of (G.gateSparks || [])){ if (now < q.t0 || now > q.t1) continue; const u = (now - q.t0) / (q.t1 - q.t0), e = easeIO(u);
+    const x = q.x + (q.ax - q.x) * e, y = q.y + (q.ay - q.y) * e - Math.sin(u * Math.PI) * 30;
+    c.save(); c.globalAlpha = 0.9; const gr = c.createRadialGradient(x, y, 0, x, y, 12); gr.addColorStop(0, '#fff6c8'); gr.addColorStop(1, 'rgba(255,200,60,0)'); c.fillStyle = gr; c.beginPath(); c.arc(x, y, 12, 0, Math.PI * 2); c.fill(); c.restore(); }
+}
+// Заказ на замке (19.11 вечер, Андрей: «на воротах может быть размещать прям заказ, который надо собрать, чтобы они открылись?»): обычная карточка заказа,
+// только на заборе — по центру области ворот; фишки в ряд (узкая высокая область — в столбик); замок висит над карточкой (нет места — слева на кромке).
+// Фигура, нужная замку, летит прямо в своё место на карточке (orderSlotXY → gateChipXY), место подсвечивается при свайпе, как в панели.
+function gateOfSlot(a){ const s = G.s; if (!s || !s.gates || a < s.show) return null; return s.gates.find(q => q.slot === a && q.ord) || null; }
+function gateCardRect(gt, g){
+  const s = G.s, cs = g.cell, xs = gt.cells.map(c => c % s.w), ys = gt.cells.map(c => Math.floor(c / s.w));
+  const x0 = Math.min(...xs), x1 = Math.max(...xs) + 1, y0 = Math.min(...ys), y1 = Math.max(...ys) + 1, p0 = cellXY(y0 * s.w + x0, g);
+  const bw = (x1 - x0) * cs, bh = (y1 - y0) * cs, n = gt.ord.length, hor = bw >= bh, pad = cs * 0.13;
+  const room = hor ? bw - cs * 0.2 : bh - cs * 0.7;
+  const cr = Math.max(cs * 0.17, Math.min(cs * 0.28, (room - 2 * pad) / (n * 2.2 - 0.2))), step = cr * 2.2, len = (n - 1) * step + 2 * cr + 2 * pad;
+  const w = hor ? len : 2 * cr + 2 * pad, h = hor ? 2 * cr + 2 * pad : len, lockUp = !hor || bh - h >= cs * 0.55, lr = cs * 0.17;
+  const cx = p0.x + bw / 2 + (lockUp ? 0 : lr * 0.6), cy = p0.y + bh / 2 + (lockUp ? lr * 0.7 : 0);
+  return { x: cx - w / 2, y: cy - h / 2, w, h, cr, step, n, hor, lockUp, lr };
+}
+function gateChipXY(R, k){ const o = R.step * k - R.step * (R.n - 1) / 2; return R.hor ? { x: R.x + R.w / 2 + o, y: R.y + R.h / 2, r: R.cr } : { x: R.x + R.w / 2, y: R.y + R.h / 2 + o, r: R.cr }; }
+function drawGateCard(c, g, gt, now, al, sc){
+  const R = gateCardRect(gt, g), V = G.view, card = V && V.cards[gt.slot], ts = G.timeScale, g2 = G2 && G.g2;
+  const f = card ? card.f : gt.ord.map(() => true), done = !card || card.done || f.every(Boolean);
+  const cx = R.x + R.w / 2, cy = R.y + R.h / 2, tl = card && card.land ? (now - card.land) * ts : 1e9, hit = tl >= 0 && tl < 330 && !REDUCED, he = hit ? Math.exp(-tl / 85) * Math.cos(tl / 36) : 0;
+  c.save(); c.globalAlpha *= al; c.translate(cx, cy); c.scale(sc * (1 + 0.06 * he), sc * (1 - 0.08 * he)); c.translate(-cx, -cy);
+  if (!done && !REDUCED){ const b = 0.5 + 0.5 * Math.sin(now / 420), gl = c.createRadialGradient(cx, cy, Math.min(R.w, R.h) * 0.3, cx, cy, Math.max(R.w, R.h) * 0.62 + 10);   // тёплое свечение — «вот что нужно замку»
+    gl.addColorStop(0, 'rgba(255,214,90,' + (0.32 + 0.16 * b).toFixed(3) + ')'); gl.addColorStop(1, 'rgba(255,214,90,0)'); c.fillStyle = gl; c.fillRect(R.x - 24, R.y - 24, R.w + 48, R.h + 48); }
+  drawCard(c, R.x, R.y, R.w, R.h, done, 3);
+  c.strokeStyle = done ? P.ok : '#e9a91e'; c.lineWidth = 2.5; rr(c, R.x + 0.5, R.y + 0.5, R.w - 1, R.h - 1, 12); c.stroke();   // золотая кромка — карточка замка
+  gt.ord.forEach((col, i) => { const p = gateChipXY(R, i), cr = R.cr;
+    if (f[i]){ const pt = now - (card ? card.pop[i] : 0), pop = pt >= 0 && pt < 300 && !REDUCED ? 1 + 0.3 * Math.exp(-pt * ts / 70) * Math.cos(pt * ts / 40) : 1;
+      if (g2) drawG2Done(c, col, p.x, p.y, cr, pop, card ? pt : 1e9, ts); else { drawChip(c, col, p.x, p.y, cr, pop); drawCheckBadge(c, p.x + cr * 0.72, p.y + cr * 0.72, cr * 0.4); }
+      return; }
+    c.fillStyle = P.pSlot; c.beginPath(); c.arc(p.x, p.y, cr, 0, Math.PI * 2); c.fill();
+    drawShape(c, col, p.x, p.y + 1, cr * (ROYAL ? 0.82 : 0.7));
+    const hl = G.hlT; if (hl && hl.slot === gt.slot && hl.k === i){ c.save(); c.globalAlpha = 0.6 + 0.4 * Math.sin(now / 90); c.strokeStyle = P.ok; c.lineWidth = 4; c.beginPath(); c.arc(p.x, p.y, cr + 4, 0, Math.PI * 2); c.stroke(); c.restore(); }
+  });
+  const pulse = done ? 1 : 1 + 0.04 * Math.sin(now / 300);
+  if (R.lockUp) drawLock(c, cx, R.y - R.lr * 0.62, R.lr * pulse, 0); else drawLock(c, R.x - R.lr * 0.15, cy - R.lr * 0.2, R.lr * 0.9 * pulse, 0);
+  c.restore();
+}
+function drawFenceCell(c, x, y, cs){
+  c.fillStyle = '#6d4322'; rr(c, x + 1, y + 1, cs - 2, cs - 2, cs * 0.08); c.fill();
+  const n = 3, w = (cs - 8) / n;
+  for (let k = 0; k < n; k++){ const px = x + 4 + k * w, gr = c.createLinearGradient(px, 0, px + w, 0); gr.addColorStop(0, '#b47a43'); gr.addColorStop(1, '#93602f');
+    c.fillStyle = gr; rr(c, px + 1, y + 3, w - 2, cs - 6, 3); c.fill(); }
+  c.fillStyle = '#7a4a22'; rr(c, x + 2, y + cs * 0.28, cs - 4, cs * 0.1, 2); c.fill(); rr(c, x + 2, y + cs * 0.64, cs - 4, cs * 0.1, 2); c.fill();
+  c.fillStyle = '#e6b04a'; for (const yy of [0.33, 0.69]) for (let k = 0; k < n; k++){ c.beginPath(); c.arc(x + 4 + k * w + w / 2, y + cs * yy, 1.6, 0, Math.PI * 2); c.fill(); }
+}
+function drawLock(c, x, y, r, n){
+  c.save(); c.lineWidth = r * 0.28; c.strokeStyle = '#b8862b'; c.beginPath(); c.arc(x, y - r * 0.55, r * 0.55, Math.PI, 0); c.stroke();
+  const gr = c.createLinearGradient(0, y - r * 0.6, 0, y + r); gr.addColorStop(0, '#ffe08a'); gr.addColorStop(1, '#d99a1f');
+  c.fillStyle = 'rgba(60,30,0,0.35)'; rr(c, x - r, y - r * 0.5 + 3, r * 2, r * 1.6, r * 0.35); c.fill();
+  c.fillStyle = gr; rr(c, x - r, y - r * 0.5, r * 2, r * 1.6, r * 0.35); c.fill(); c.strokeStyle = '#9a6a14'; c.lineWidth = 1.5; c.stroke();
+  if (n > 0){ c.font = '900 ' + Math.round(r * 1.25) + 'px Nunito, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3; c.strokeStyle = '#7a4a10'; c.strokeText(n, x, y + r * 0.32); c.fillStyle = '#fff'; c.fillText(n, x, y + r * 0.32); c.textBaseline = 'alphabetic'; }
+  else { c.fillStyle = '#7a4a10'; c.beginPath(); c.arc(x, y + r * 0.15, r * 0.2, 0, Math.PI * 2); c.fill(); c.fillRect(x - r * 0.08, y + r * 0.2, r * 0.16, r * 0.4); }
+  c.restore();
+}
+// Сундук: тёмное дерево в золотых полосах, крышка; из-под крышки торчит следующая половинка; на углу — монетка с числом половинок. Выдача — крышка подпрыгивает.
+function chestShown(i, now){                                  // что показывает сундук сейчас (до своей выдачи на экране — прежнее)
+  const ch = G.s.chests && G.s.chests.find(q => q.cell === i), ev = (G.chestEv || {})[i] || [];
+  let left = ch ? ch.left : 0, next = ch ? ch.next : 0, popT = -1e9;
+  for (let k = ev.length - 1; k >= 0; k--){ if (now < ev[k].t){ left = ev[k].left + 1; next = ev[k].code; } else { popT = Math.max(popT, ev[k].t); } }
+  return { left, next, popT };
+}
+function drawChestAt(c, i, x, y, cs, now){
+  const st = chestShown(i, now), u = (now - st.popT) / (260 / G.timeScale), lift = u >= 0 && u < 1 ? Math.sin(u * Math.PI) : 0;
+  const bx = x + cs * 0.06, bw = cs * 0.88, by = y + cs * 0.44, bh = cs * 0.48;
+  c.save();
+  c.fillStyle = 'rgba(40,20,0,0.22)'; c.beginPath(); c.ellipse(x + cs / 2, y + cs * 0.9, cs * 0.38, cs * 0.07, 0, 0, Math.PI * 2); c.fill();
+  if (st.left > 0 && st.next > 0){ const k = 0.66, bob = 0.025 * Math.sin(now / 320); drawPiece(c, st.next, x + cs * (1 - k) / 2, y - cs * (0.06 + bob) - lift * cs * 0.22, cs * k, 1); }   // следующая — торчит из-под крышки
+  const gb = c.createLinearGradient(0, by, 0, by + bh); gb.addColorStop(0, '#9b6334'); gb.addColorStop(1, '#6e4120');
+  c.fillStyle = gb; rr(c, bx, by, bw, bh, cs * 0.07); c.fill();
+  c.fillStyle = '#e8b445'; c.fillRect(bx + bw * 0.18, by, bw * 0.08, bh); c.fillRect(bx + bw * 0.74, by, bw * 0.08, bh);
+  c.strokeStyle = '#4e2c12'; c.lineWidth = 1.4; rr(c, bx, by, bw, bh, cs * 0.07); c.stroke();
+  c.save(); c.translate(x + cs / 2, by); c.rotate(-lift * 0.35); c.translate(-x - cs / 2, -by);     // крышка
+  const gl = c.createLinearGradient(0, by - cs * 0.2, 0, by); gl.addColorStop(0, '#b27742'); gl.addColorStop(1, '#85502a');
+  c.fillStyle = gl; c.beginPath(); c.moveTo(bx - 2, by + 2); c.lineTo(bx - 2, by - cs * 0.08); c.quadraticCurveTo(x + cs / 2, by - cs * 0.3, bx + bw + 2, by - cs * 0.08); c.lineTo(bx + bw + 2, by + 2); c.closePath(); c.fill();
+  c.strokeStyle = '#4e2c12'; c.stroke(); c.restore();
+  c.fillStyle = '#ffd35a'; rr(c, x + cs / 2 - cs * 0.07, by - cs * 0.02, cs * 0.14, cs * 0.14, 3); c.fill(); c.strokeStyle = '#9a6a14'; c.lineWidth = 1; c.stroke();   // застёжка
+  if (st.left > 0){ const r = cs * 0.17, ox = x + cs * 0.84, oy = y + cs * 0.82; c.fillStyle = '#ffcf4a'; c.beginPath(); c.arc(ox, oy, r, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#a8740f'; c.lineWidth = 1.5; c.stroke();
+    c.font = '900 ' + Math.round(r * 1.3) + 'px Nunito, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#6b3d06'; c.fillText(st.left, ox, oy + 1); c.textBaseline = 'alphabetic'; }
+  c.restore();
+}
+function drawChestFly(c, g, D, now){                          // половинка вылетает из-под крышки дугой и садится в клетку
+  const a = cellXY(D.from, g), b = cellXY(D.cell, g), cs = g.cell, u = Math.min(1, (now - D.t0) / (D.t1 - D.t0)), e = easeIO(u);
+  const x = a.x + (b.x - a.x) * e, y = a.y - cs * 0.15 + (b.y - a.y + cs * 0.15) * e - Math.sin(u * Math.PI) * cs * 0.7, k = 0.56 + 0.44 * e;
+  drawPiece(c, D.code, x + cs * (1 - k) / 2, y + cs * (1 - k) / 2, cs * k, 1, 1 + 0.1 * Math.sin(u * Math.PI));
+}
 // ---------- Royal: туториальный фокус (17.11, Андрей: «затемняем всё и показываем кружком там, где надо») ----------
 // Экран затемняется (~65%), вырезано мягкое пятно с тонким светлым ободком и лёгким дыханием, рука-палец показывает на пятно. Текста нет.
 // Пока фокус открыт — игра на паузе (setPaused 'tut'), ввод вне пятна заблокирован; тап в любое место или TUT_MS — следующий шаг.
 // На шаге «пара» касание в пятне сразу отдаёт свайп полю. Каждый шаг — один раз (G.save.tut; сброс прогресса в DEV его обнуляет).
 const TUT_ON = ROYAL, TUT_MS = 1800, TUT_DIM = 0.65;
-const TUT_DUR = { untray: 900, honey: 2600 };   // 18.11: урок мёда — пятно со свайпом держится дольше (рука успевает показать ход дважды)   // 17.11 (Андрей): фокус «лоток отдал фигуру в заказ» на 3-м — вдвое короче, и праздник после него тоже (G.winHoldK)
+const TUT_DUR = { untray: 900, honey: 2600, rug: 2600, chest: 2600, gate: 2200 };   // 18.11: урок мёда — пятно со свайпом держится дольше (рука успевает показать ход дважды)   // 17.11 (Андрей): фокус «лоток отдал фигуру в заказ» на 3-м — вдвое короче, и праздник после него тоже (G.winHoldK)
 const TUT_START = { 0: ['goal', 'pair'], 1: ['ghost'], 4: ['boosts'], 7: ['vert'], 10: ['honey'], 14: ['rainbow'], 18: ['crates'], 22: ['chain'], 26: ['timer'] };   // по индексу уровня (номер − 1); 18.11 ночь — новый график: верх/низ 7, мёд 11, радужная 15, ящики 19, цепи 23, таймер 27
 const TUT = { q: [], cur: null, t0: 0, cv: null, slot: -1, due: [] };
+// 19.11: шаги фокуса по уровню. Уровни 1–9 одинаковы во всех линейках (TUT_START по индексу); дальше в линейках dev/release шаги лежат в самом уровне (tut).
+function tutIds(li){ return (li < 9 || CFG.LEVEL_PLAN === 'v3' || (CFG.LEVEL_PLAN === 'main' && li < 100) ? TUT_START[li] : LEVELS[li] && LEVELS[li].tut) || []; }   // main: 1–100 — уроки v3 на своих местах
 // Событийный шаг — по времени, а не через очередь вида: новый ход догоняет вид (snapView) и стёр бы его.
 function tutAt(id, t, slot){ if (TUT_ON && !tutSeen(id) && !TUT.due.some(d => d.id === id)) TUT.due.push({ id, t, slot: slot === undefined ? -1 : slot }); }
 function tutSeen(id){ return !!(G.save.tut && G.save.tut[id]); }
@@ -3789,7 +4380,7 @@ function tutCanvas(){
     if (!TUT.cur) return; e.preventDefault();
     const fr = $('frame').getBoundingClientRect(), x = e.clientX - fr.left, y = e.clientY - fr.top, h = TUT.hole, inside = h && x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h;
     const id = TUT.cur; tutNext('tap');
-    if (inside && (id === 'pair' || id === 'honey') && !TUT.cur){ try { cv.dispatchEvent(new PointerEvent('pointerdown', { clientX: e.clientX, clientY: e.clientY, pointerId: e.pointerId, pointerType: e.pointerType, isPrimary: true, bubbles: true })); } catch (err) {} }   // свайп по паре — сразу полю
+    if (inside && (id === 'pair' || id === 'honey' || id === 'rug' || id === 'chest') && !TUT.cur){ try { cv.dispatchEvent(new PointerEvent('pointerdown', { clientX: e.clientX, clientY: e.clientY, pointerId: e.pointerId, pointerType: e.pointerType, isPrimary: true, bubbles: true })); } catch (err) {} }   // свайп по паре — сразу полю
   });
   return TUT.cv = c;
 }
@@ -3804,7 +4395,12 @@ function tutRect(id){
   if (id === 'ghost') return s.next && s.next.cell >= 0 ? cellR(s.next.cell) : null;
   if (id === 'tray') return trayRect(g);
   if (id === 'untray'){ const r = TUT.slot >= 0 ? ordersLayout(g).cards[TUT.slot] : null; return r || null; }
-  if (id === 'crates') return ordersLayout(g).crate;
+  if (id === 'crates' || id === 'rugGoal') return ordersLayout(g).crate;
+  if (id === 'rug'){ const m = lessonMove(s), pk = m >= 0 ? peekMove(s, m) : null, cells = []; for (let i = 0; i < s.grid.length; i++) if (s.rug && s.rug[i]) cells.push(cellR(i));   // ковёр: пятно на ковре и на ходе, рука тянет
+    if (pk){ cells.push(cellR(m >> 2), cellR(pk.to)); if (pk.partner >= 0) cells.push(cellR(pk.partner)); } return union(cells); }
+  if (id === 'gate'){ const gt = s.gates && s.gates.find(q => !q.open); return gt ? union(gt.cells.map(cellR)) : null; }
+  if (id === 'chest'){ const ch = s.chests && s.chests.find(q => q.left > 0); if (!ch) return null; const m = lessonMove(s), pk = m >= 0 ? peekMove(s, m) : null;
+    return union([cellR(ch.cell), pk ? cellR(m >> 2) : null, pk ? cellR(pk.to) : null, pk && pk.partner >= 0 ? cellR(pk.partner) : null]); }
   if (id === 'vert') return firstCell(i => s.grid[i] > 0 && isVert(s.grid[i]));
   if (id === 'honey'){                              // урок мёда (18.11): шаг 1 — пятно на пути плитки до мёда, рука показывает свайп
     const m = lessonMove(s), pk = m >= 0 ? peekMove(s, m) : null;
@@ -3859,7 +4455,7 @@ function drawSpot(){
   const x = h.x - br, y = h.y - br, w = h.w + br * 2, hh = h.h + br * 2, rad = Math.min(26, Math.min(w, hh) / 2);
   c.save(); c.globalCompositeOperation = 'destination-out'; c.shadowColor = '#000'; c.shadowBlur = 16; c.fillStyle = '#000'; rr(c, x, y, w, hh, rad); c.fill(); c.restore();   // мягкое пятно
   c.save(); c.globalAlpha = 0.85 * inA; c.strokeStyle = '#fff6d8'; c.lineWidth = 2.5; rr(c, x - 2, y - 2, w + 4, hh + 4, rad + 2); c.stroke(); c.restore();   // тонкий светлый ободок
-  const swipe = TUT.cur === 'pair' || (TUT.cur === 'honey' && LEVELS[G.s.li] && LEVELS[G.s.li].lesson);
+  const swipe = TUT.cur === 'pair' || TUT.cur === 'rug' || TUT.cur === 'chest' || (TUT.cur === 'honey' && LEVELS[G.s.li] && LEVELS[G.s.li].lesson);
   if (swipe){                                       // рука показывает свайп по паре (как на уроке); на уроке мёда — свайп до мёда
     const m = lessonMove(G.s); if (m >= 0){ const g = geo(), a = cellXY(m >> 2, g), b = cellXY(peekMove(G.s, m).to, g), cr = cv.getBoundingClientRect();
       const ax = cr.left - fr.left + (a.x + g.cell * 0.5) * scale, ay = cr.top - fr.top + (a.y + g.cell * 0.55) * scale; drawHand(c, ax, ay, (b.x - a.x) * scale, (b.y - a.y) * scale, t); }
@@ -3908,7 +4504,8 @@ function boardShape(s, g, d, r){
 let baseCv = null;
 function royalBase(g){
   if (!ROYAL){ G.baseKey = ''; return null; }
-  const s = G.s, key = [cv.width, cv.height, g.ox, g.oy, g.bw, g.bh, g.py, s.w, s.h, s.grid.indexOf(VOID) >= 0 ? s.li : ''].join(',');
+  const s = G.s, now = clock(), rk = s.rug ? s.rug.map((v, i) => rugSettled(s, i, now) ? 1 : 0).join('') : '';   // 19.11: устоявшийся ковёр — часть статичного слоя
+  const key = [cv.width, cv.height, g.ox, g.oy, g.bw, g.bh, g.py, s.w, s.h, s.grid.indexOf(VOID) >= 0 ? s.li : '', rk].join(',');
   if (G.baseKey === key && baseCv) return baseCv;
   if (!baseCv){ baseCv = document.createElement('canvas'); baseCv.id = 'base'; cv.parentNode.insertBefore(baseCv, cv); }
   baseCv.style.display = ''; baseCv.width = cv.width; baseCv.height = cv.height;
@@ -3936,6 +4533,7 @@ function royalBase(g){
   for (let k = 1; k < s.h; k++){ const y = g.oy + k * cs; c.moveTo(bx, y); c.lineTo(bx + bw, y); }
   c.stroke(); c.restore();
   }
+  if (s.rug) drawRugCells(c, g, s, now, (i) => rugSettled(s, i, now));   // ковёр — по доске, под плитками
   c.fillStyle = TH.panelShadow; rr(c, g.px, g.py + 4, g.pw, PANEL_H, 22); c.fill();                    // панель цели
   const pg = c.createLinearGradient(0, g.py, 0, g.py + PANEL_H); pg.addColorStop(0, TH.panelTop); pg.addColorStop(1, TH.panelBot);
   c.fillStyle = pg; rr(c, g.px, g.py, g.pw, PANEL_H, 22); c.fill();
@@ -3971,6 +4569,8 @@ function render(){
       ctx.lineWidth = 4; rr(ctx, g.ox - 8, g.oy - 8, g.bw + 16, g.bh + 16, 18); ctx.stroke(); ctx.restore();
     }
   }
+  if (s.rug) drawRugLayer(ctx, g, s, now, base);   // ковёр (19.11) — под плитками, над доской (устоявшийся — в слое #base)
+  const fenced = gateFenced(s, now);
   for (let i = 0; i < s.grid.length; i++){ const p = cellXY(i, g); if (!base){ ctx.fillStyle = P.slot; rr(ctx, p.x + cs * 0.05, p.y + cs * 0.05, cs * 0.9, cs * 0.9, cs * 0.18); ctx.fill(); } if (s.floor[i] === HONEY){ const sz = cs * (s.grid[i] > 0 ? 1.12 : 1) * honeyK(i, now), cy = p.y + cs * (s.grid[i] > 0 ? 0.52 : 0.5); drawHoney(ctx, p.x + cs / 2 - sz / 2, cy - sz / 2, sz); } }
   // искра следующей раздачи
   if (s.every > 0 && s.next && s.next.cell >= 0 && !isWin(s) && !G.drops.some(D => now < D.t1)){ const p = ghostXY(s, g, now); if (!(ROYAL && CLAW_ON && ART.clawClosed)) drawSpark(ctx, p.x, p.y, cs, s.next.code, now); }
@@ -3986,7 +4586,7 @@ function render(){
   }
   let hlT = ghost && ghost.target && ghost.target.kind === 'order' ? ghost.target : null;
   if (J2 && !hlT){ const M = G.merges.find(q => q.target.kind === 'order' && now >= q.tShow && now < q.flyEnd); if (M) hlT = M.target; }   // v2: место в заказе подсвечено от отпускания до посадки — адрес доставки не теряется
-  drawOrders(ctx, g, now, hlT);
+  drawOrders(ctx, g, now, hlT); G.hlT = hlT;   // ворота (19.11 вечер): место на карточке замка подсвечивается так же
   const wob = ROYAL && !REDUCED && G.trayWob && now >= G.trayWob && now < G.trayWob + CFG.WOBBLE_MS / G.timeScale ? (() => { const u = (now - G.trayWob) / (CFG.WOBBLE_MS / G.timeScale); return CFG.WOBBLE_PX * Math.sin(u * Math.PI * 4) * (1 - u); })() : 0;
   if (wob){ ctx.save(); ctx.translate(wob, 0); }   // royal: «не влезла» — покачивается лоток, а не экран
   const tjt = g2 && G.g2.tray ? (now - G.g2.trayT) * G.timeScale : 1e9, tjk = tjt < 420 && !REDUCED ? 1 + 0.16 * Math.exp(-tjt / 120) * Math.cos(tjt / 50) : 1;   // G2: лоток вздрагивает, когда осталось одно место / стал полон
@@ -4001,7 +4601,8 @@ function render(){
   let hintCell = -1, hintDir = 0, hintK = 0;
   const idle = now - G.lastInputT - CFG.IDLE_HINT_MS;
   const lesson = !!(LEVELS[s.li] && LEVELS[s.li].lesson) && (!s.every || s.moves === 0);   // на уроке ведёт рука, подмигивание не нужно; на уроке раздачи (4) рука только до первого хода, дальше раздача сама встаёт в ряд с парой
-  if (idle > 0 && !lesson && G.screen === 'game' && !G.drag && now >= G.fxUntil && !isWin(s) && !isLose(s)){
+  const hintLv = s.li + 1 <= CFG.IDLE_HINT_UNTIL;   // 19.11 вечер: подсказка при бездействии — только по idle_hint_until_level (9) включительно
+  if (idle > 0 && hintLv && !lesson && G.screen === 'game' && !G.drag && now >= G.fxUntil && !isWin(s) && !isLose(s)){
     if (G.hintFor !== s){                         // сначала стыковка под заказ; в лоток — только пока там просторно
       G.hintFor = s; const om = orderMoves(s);
       const tm = om.length || s.tray.length > s.cap - 2 ? [] : dockMoves(s).filter(m => moveKind(s, m) === 'tray');
@@ -4035,6 +4636,8 @@ function render(){
     let c = s.grid[i];
     const gh = ghostAt[i];
     if (gh && gh.kind === 'crate'){ const p = cellXY(i, g), k = ROYAL ? 0.84 : 1; drawCrate(ctx, p.x + cs * (1 - k) / 2, p.y + cs * (1 - k) / 2, cs * k, 1 + 0.05 * Math.sin(now / 50)); continue; }
+    if (fenced.has(i)) continue;                   // за забором (ворота ещё закрыты на экране) — рисует drawGatesLayer
+    if (gh && gh.kind === 'chest'){ const p = cellXY(i, g); drawChestAt(ctx, i, p.x, p.y, cs, now); continue; }   // сундук опустел в ядре, но на экране ещё выдаёт
     if (gh && (gh.kind === 'stone' || gh.kind === 'piece')) c = gh.code;
     if (!c || skip.has(i)) continue;
     let { x, y } = cellXY(i, g);
@@ -4043,7 +4646,8 @@ function render(){
       const v = (now - G.hit.t0) / (G.hit.t1 - G.hit.t0), k = Math.sin(v * Math.PI) * (1 - v) * cs * 0.09;
       x += DIRS[G.hit.dir][0] * k; y += DIRS[G.hit.dir][1] * k;
     }
-    if (c === VOID) continue;                      // вырез поля — клетки нет
+    if (c === VOID || c === GATE) continue;        // вырез поля — клетки нет; за забором — рисует drawGatesLayer
+    if (c === CHEST){ drawChestAt(ctx, i, x, y, cs, now); continue; }
     if (c === STONE){ drawStone(ctx, i, x, y, cs); continue; }
     if (c === CRATE){ if (ROYAL){ crateShadow(ctx, x, y, cs); drawCrate(ctx, x + cs * 0.08, y + cs * 0.05, cs * 0.84); } else drawCrate(ctx, x, y, cs); continue; }   // royal: ящик меньше клетки и стоит на ней
     let scl = 1, sx = 1, sy = 1;
@@ -4104,6 +4708,7 @@ function render(){
     const p = cellXY(i, g), hk = honeyK(i, now), hs = cs * 0.8 * (1 + (hk - 1) * 1.6), lip = cs * (0.2 + Math.max(0, hk - 1) * 0.5);   // «чавк»: мёд выдавливается из-под плитки шире и ниже
     ctx.save(); rr(ctx, p.x - cs * 0.2, p.y + cs - lip, cs * 1.4, lip + cs * 0.1, 0); ctx.clip(); drawHoney(ctx, p.x + cs / 2 - hs / 2, p.y + cs * 0.3 + (cs * 0.8 - hs) * 0.2, hs); ctx.restore();
   }
+  if (s.gates) drawGatesLayer(ctx, g, s, now, fenced);
   if (g2) drawG2Board(ctx, g, now, false);
   if (ROYAL && CLAW_ON && ART.clawClosed && s.every > 0 && s.next && s.next.cell >= 0 && !isWin(s) && !G.drops.some(D => now < D.t1)) drawClawIdle(ctx, g, s, now);   // royal: захват — поверх плиток (тросик над клеткой)
   if (G.kbd && s.grid[G.cursor] <= 0){ const p = cellXY(G.cursor, g); ctx.strokeStyle = P.accent; ctx.lineWidth = 2; rr(ctx, p.x + 4, p.y + 4, cs - 8, cs - 8, cs * 0.2); ctx.stroke(); }
@@ -4142,6 +4747,7 @@ function render(){
     if (now >= D.t1) continue;
     // призрак в клетке становится плиткой: до начала — тот же призрак, затем плитка проявляется с лёгким отскоком
     const p = cellXY(D.cell, g);
+    if (D.from !== undefined){ if (now >= D.t0) drawChestFly(ctx, g, D, now); continue; }   // сундук (19.11): половинка вылетает дугой из-под крышки
     if (ROYAL && CLAW_ON && ART.clawClosed){ drawClawDrop(ctx, g, D, now); continue; }   // royal: сброс из захвата
     if (D.rel){ const q = cellXY(D.planned, g), tr = D.t0 + D.rel / G.timeScale;   // переезд призрака из занятой клетки (видно, куда он делся)
       if (now < tr){ const u = Math.max(0, Math.min(1, (now - D.t0) / (D.rel / G.timeScale))), e = easeIO(u); drawSpark(ctx, q.x + (p.x - q.x) * e, q.y + (p.y - q.y) * e - Math.sin(u * Math.PI) * cs * 0.2, cs, D.code, now); continue; }
